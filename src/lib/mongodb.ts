@@ -2,7 +2,6 @@
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 declare global {
-  // evita recriar conexão em hot-reload (dev) / serverless
   // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
@@ -14,7 +13,7 @@ const client = new MongoClient(uri, {
   serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
 });
 
-// usa cache global em dev e em ambientes serverless
+// cache global p/ dev/serverless
 const clientPromise: Promise<MongoClient> =
   global._mongoClientPromise ?? client.connect();
 
