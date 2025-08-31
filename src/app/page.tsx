@@ -1,12 +1,25 @@
-// app/page.tsx
+// src/app/page.tsx
 import { getDb } from "@/lib/mongodb";
 
 export const runtime = "nodejs";
 
+type Reading = {
+  _id?: string;
+  deviceId: string;
+  temperature: number;
+  temperature_bmp: number;
+  humidity: number;
+  pressure: number;
+  rain_mm2: number;
+  rain_count: number;
+  wind_ms: number;
+  ts: Date;
+};
+
 export default async function Home() {
   const db = await getDb();
   const readings = await db
-    .collection("readings")
+    .collection<Reading>("readings")
     .find({})
     .sort({ ts: -1 })
     .limit(10)

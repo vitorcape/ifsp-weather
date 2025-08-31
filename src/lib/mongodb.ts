@@ -1,22 +1,26 @@
-// lib/mongodb.ts
+// src/lib/mongodb.ts
 import { MongoClient, ServerApiVersion } from "mongodb";
+
+declare global {
+  // evita recriar conexão em hot-reload (dev) / serverless
+  // eslint-disable-next-line no-var
+  var _mongoClientPromise: Promise<MongoClient> | undefined;
+}
 
 const uri = process.env.MONGODB_URI!;
 if (!uri) throw new Error("Defina MONGODB_URI nas variáveis de ambiente.");
 
-let client: MongoClient;
-let clientPromise: Promise<MongoClient>;
+const client = new MongoClient(uri, {
+  serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
+});
 
-// cache global para evitar abrir várias conexões em dev/serverless
-const g = global as unknown as { _mongoClientPromise?: Promise<MongoClient> };
+// usa cache global em dev e em ambientes serverless
+const clientPromise: Promise<MongoClient> =
+  global._mongoClientPromise ?? client.connect();
 
-if (!g._mongoClientPromise) {
-  client = new MongoClient(uri, {
-    serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
-  });
-  g._mongoClientPromise = client.connect();
+if (!global._mongoClientPromise) {
+  global._mongoClientPromise = clientPromise;
 }
-clientPromise = g._mongoClientPromise!;
 
 export async function getDb() {
   const c = await clientPromise;

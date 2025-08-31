@@ -1,9 +1,20 @@
-// app/api/ingest/route.ts
+// src/app/api/ingest/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 
-// Garanta runtime Node.js para usar o driver do Mongo
 export const runtime = "nodejs";
+
+type IngestBody = {
+  deviceId?: string;
+  temperature: number;
+  temperature_bmp: number;
+  humidity: number;
+  pressure: number;
+  rain_mm2: number;
+  rain_count: number;
+  wind_ms: number;
+  ts?: string | number | Date;
+};
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
@@ -11,29 +22,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let data: any;
-  try {
-    data = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const body = (await req.json()) as IngestBody;
 
-  const { deviceId, temperature, temperature_bmp, humidity, ts, pressure, rain_mm2, rain_count, wind_ms } = data;
-
-  if (typeof temperature !== "number" || typeof temperature_bmp !== "number" || typeof humidity !== "number") {
+  if (typeof body.temperature !== "number" || typeof body.humidity !== "number") {
     return NextResponse.json({ error: "temperature/humidity devem ser números" }, { status: 422 });
   }
 
   const doc = {
-    deviceId: deviceId || "esp32-001",
-    temperature,
-    temperature_bmp,
-    humidity,
-    pressure,
-    rain_mm2,
-    rain_count,
-    wind_ms,
-    ts: ts ? new Date(ts) : new Date(),
+    deviceId: body.deviceId ?? "esp32-001",
+    temperature: body.temperature,
+    temperature_bmp: body.temperature_bmp,
+    humidity: body.humidity,
+    pressure: body.pressure,
+    rain_mm2: body.rain_mm2,
+    rain_count: body.rain_count,
+    wind_ms: body.wind_ms,
+    ts: body.ts ? new Date(body.ts) : new Date(),
   };
 
   const db = await getDb();
