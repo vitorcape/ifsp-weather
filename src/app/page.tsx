@@ -2,6 +2,7 @@
 import { getDb } from "@/lib/mongodb";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type Reading = {
   _id?: string;
