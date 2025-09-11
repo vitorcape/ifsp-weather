@@ -2,7 +2,6 @@
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 declare global {
-  // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
@@ -13,7 +12,6 @@ function getClientPromise(): Promise<MongoClient> {
       "Defina MONGODB_URI nas variáveis de ambiente (Vercel: Settings → Environment Variables)."
     );
   }
-
   if (!global._mongoClientPromise) {
     const client = new MongoClient(uri, {
       serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },

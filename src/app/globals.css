@@ -1,26 +1,125 @@
-@import "tailwindcss";
+/* react-day-picker base CSS */
+@import "react-day-picker/src/style.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* tema: fundo claro dentro do card branco translúcido */
+.rdp {
+  --rdp-accent-color: #2563eb;         /* azul */
+  --rdp-accent-background-color: rgba(37,99,235,.12);
+  --rdp-outline: 2px solid rgba(37,99,235,.35);
+  --rdp-background-color: rgba(255,255,255,0.92);
+  color: #0f2a5b;
+}
+.rdp-button:hover:not([disabled]) { background: rgba(37,99,235,.08); }
+.rdp-day_selected { color: #fff; }
+.rdp-caption_label { font-weight: 700; }
+
+/* Fundo azul estilo app clima */
+.bg-sky {
+  /* gradiente suave em tons de azul */
+  background: linear-gradient(180deg, #1a6ee8 0%, #3386f2 40%, #4da0ff 100%);
+  min-height: 100vh;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* container que dá respiro abaixo da navbar */
+.content-wrapper {
+  padding-top: 8px;
+  padding-bottom: 24px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Navbar translúcida */
+.navbar-translucent {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Cartões “vidro” */
+.card-glass {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+}
+
+/* Tipografia auxiliar */
+.label-muted {
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+}
+
+/* botões claros em fundo azul */
+.btn-light {
+  color: #0b2a5b;
+}
+
+.hero .display-1 {
+  font-size: 4rem;
+}
+
+/* === Charts Modernos === */
+.chart-card {
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.85); /* <- branco com opacidade */
+  backdrop-filter: blur(6px);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+  padding: 16px;
+  color: #0f2a5b; /* texto escuro para bom contraste no branco */
+}
+
+.chart-title {
+  font-weight: 700;
+  letter-spacing: .2px;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+
+.chart-legend {
+  display: inline-flex;
+  gap: .5rem;
+  align-items: center;
+  background: rgba(255, 255, 255, .18);
+  color: #0b2a5b;
+  padding: .25rem .6rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: .85rem;
+}
+
+.chart-badge {
+  background: rgba(255, 255, 255, .2);
+  color: #102a59;
+  border-radius: 9999px;
+  padding: .25rem .6rem;
+  font-weight: 600;
+}
+
+/* tooltip “glass” */
+.recharts-tooltip-wrapper .tooltip-glass {
+  background: rgba(255, 255, 255, .96);
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .18);
+  padding: .6rem .8rem;
+  color: #102a59;
+  font-weight: 600;
+  border: 1px solid rgba(16, 42, 89, .08);
+}
+
+/* eixos mais discretos */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, .18);
+}
+
+.recharts-layer.recharts-line-dots circle {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .25));
+}
+
+.footer-glass {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-weight: 500;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
 }

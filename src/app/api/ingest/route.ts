@@ -7,7 +7,6 @@ export const runtime = "nodejs";
 type IngestBody = {
   deviceId?: string;
   temperature: number;
-  temperature_bmp: number;
   humidity: number;
   pressure: number;
   rain_mm2: number;
@@ -31,11 +30,9 @@ export async function POST(req: NextRequest) {
   const doc = {
     deviceId: body.deviceId ?? "esp32-001",
     temperature: body.temperature,
-    temperature_bmp: body.temperature_bmp,
     humidity: body.humidity,
     pressure: body.pressure,
     rain_mm2: body.rain_mm2,
-    rain_count: body.rain_count,
     wind_ms: body.wind_ms,
     ts: body.ts ? new Date(body.ts) : new Date(),
   };
