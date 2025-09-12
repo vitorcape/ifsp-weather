@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
     records.map(d => ({
       deviceId: d.deviceId as string,
       temperature: Number(d.temperature),
+      temperature_dht: Number(d.temperature_dht),
       humidity: Number(d.humidity),
       pressure: Number(d.pressure),
       rain_mm2: Number(d.rain_mm2),

@@ -31,16 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
               <Link className="btn btn-sm btn-outline-light rounded-pill px-3" href="/calendario">
                 <i className="fa-solid fa-calendar-days me-2"></i>Calendário
+              </Link><Link className="btn btn-sm btn-outline-light rounded-pill px-3" href="/log">
+                <i className="fa-solid fa-database me-2"></i>Logs
               </Link>
-              <a
-                className="btn btn-sm btn-outline-light rounded-pill px-3"
-                href="https://cloud.mongodb.com"
-                target="_blank"
-                rel="noreferrer"
-                title="MongoDB Atlas"
-              >
-                <i className="fa-solid fa-database me-2"></i>Atlas
-              </a>
             </div>
           </div>
         </nav>
