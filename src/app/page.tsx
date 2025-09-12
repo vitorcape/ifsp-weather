@@ -1,16 +1,353 @@
 // src/app/page.tsx
-import HomeCards from "@/components/HomeCards";
+"use client";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+import { useEffect, useState } from "react";
+import WeeklyForecast from "@/components/WeeklyForecast";
 
-export default function Home() {
+type Summary = {
+  last?: { deviceId: string; temperature: number; humidity: number; pressure: number; rain_mm2: number; wind_ms: number; ts: string };
+  stats: { tMin: number | null; tMax: number | null; hMin: number | null; hMax: number | null; count: number };
+  windStats: { totalWind: number; windCount: number; avgWind: number };
+  sunriseLabel: string;
+  sunsetLabel: string;
+  isDay: boolean;
+  nowISO: string;
+};
+
+function formatTime(input?: string | Date) {
+  if (!input) return "--:--:-- - --/--/----";
+  const dt = typeof input === "string" ? new Date(input) : input;
+  return dt.toLocaleTimeString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }) + " - " +
+  dt.toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+// Função para determinar o gradiente baseado na temperatura e hora
+function getBackgroundGradient(temperature: number, isDay: boolean, currentHour: number): string {
+  // Temperaturas de referência
+  const veryHot = 35; // 35°C+
+  const hot = 30;     // 30-35°C
+  const warm = 25;    // 25-30°C
+  const cool = 20;    // 20-25°C
+  const cold = 15;    // 15-20°C
+  const veryCold = 10; // <15°C
+
+  if (!isDay) {
+    // Noite - tons escuros com variação baseada na temperatura
+    if (temperature >= hot) {
+      return "linear-gradient(135deg, #1a1a2e 0%, #16213e 30%, #0f3460 70%, #533483 100%)"; // Noite quente - roxo escuro
+    } else if (temperature >= warm) {
+      return "linear-gradient(135deg, #0c0c1e 0%, #1a1a2e 50%, #16213e 100%)"; // Noite morna - azul escuro
+    } else if (temperature >= cool) {
+      return "linear-gradient(135deg, #000428 0%, #004e92 100%)"; // Noite fresca - azul profundo
+    } else {
+      return "linear-gradient(135deg, #232526 0%, #414345 100%)"; // Noite fria - cinza escuro
+    }
+  } else {
+    // Dia - cores baseadas na temperatura e hora
+    if (currentHour >= 6 && currentHour < 8) {
+      // Nascer do sol - tons dourados
+      return "linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%)";
+    } else if (currentHour >= 17 && currentHour < 19) {
+      // Pôr do sol - tons alaranjados
+      return "linear-gradient(135deg, #ff6b6b 0%, #ffa726 50%, #ffcc02 100%)";
+    } else if (temperature >= veryHot) {
+      // Muito quente - alaranjado/vermelho intenso
+      return "linear-gradient(135deg, #ff6b6b 0%, #ffa726 30%, #ffcc02 60%, #fff176 100%)";
+    } else if (temperature >= hot) {
+      // Quente - amarelo/alaranjado
+      return "linear-gradient(135deg, #ffa726 0%, #ffcc02 50%, #fff176 100%)";
+    } else if (temperature >= warm) {
+      // Morno - amarelo suave
+      return "linear-gradient(135deg, #ffcc02 0%, #fff176 50%, #f0f4c3 100%)";
+    } else if (temperature >= cool) {
+      // Agradável - azul claro
+      return "linear-gradient(135deg, #81c784 0%, #64b5f6 50%, #90caf9 100%)";
+    } else if (temperature >= cold) {
+      // Frio - azul
+      return "linear-gradient(135deg, #42a5f5 0%, #64b5f6 50%, #90caf9 100%)";
+    } else {
+      // Muito frio - azul intenso
+      return "linear-gradient(135deg, #1976d2 0%, #42a5f5 50%, #64b5f6 100%)";
+    }
+  }
+}
+
+// Função para determinar a cor do texto baseada no fundo
+function getTextColor(isDay: boolean, temperature: number): string {
+  if (!isDay) {
+    return "#ffffff"; // Texto branco para fundos escuros
+  }
+  
+  if (temperature >= 25) {
+    return "#333333"; // Texto escuro para fundos claros/quentes
+  } else {
+    return "#ffffff"; // Texto branco para fundos frios
+  }
+}
+
+// Função para obter emoji do clima baseado na temperatura e hora
+function getWeatherEmoji(temperature: number, isDay: boolean): string {
+  if (!isDay) {
+    if (temperature >= 25) return "🌙"; // Noite quente
+    return "🌃"; // Noite normal
+  }
+  
+  if (temperature >= 35) return "🔥"; // Muito quente
+  if (temperature >= 30) return "☀️"; // Quente  
+  if (temperature >= 25) return "🌤️"; // Morno
+  if (temperature >= 20) return "⛅"; // Agradável
+  if (temperature >= 15) return "🌥️"; // Frio
+  return "❄️"; // Muito frio
+}
+
+export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number }) {
+  const [data, setData] = useState<Summary | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      const res = await fetch("/api/home-summary", { cache: "no-store" });
+      const json: Summary = await res.json();
+      if (alive) setData(json);
+    }
+    load();
+    const id = setInterval(load, refreshMs);
+    return () => { alive = false; clearInterval(id); };
+  }, [refreshMs]);
+
+  const last = data?.last;
+  const stats = data?.stats;
+  const windStats = data?.windStats;
+  
+  // Calcular hora atual
+  const currentHour = new Date().getHours();
+  const temperature = last?.temperature || 20;
+  const isDay = data?.isDay || true;
+  
+  // Determinar estilos dinâmicos
+  const backgroundGradient = getBackgroundGradient(temperature, isDay, currentHour);
+  const textColor = getTextColor(isDay, temperature);
+  const weatherEmoji = getWeatherEmoji(temperature, isDay);
+
   return (
-    <div className="container py-4">
-      <HomeCards refreshMs={15000} />
-      <footer className="mt-5 small text-white-50 text-center">
-        Dados tirado do cu via ESP32 • Fuso: America/São Paulo
-      </footer>
+    <div 
+      style={{
+        background: backgroundGradient,
+        minHeight: "100vh",
+        color: textColor,
+        transition: "all 0.8s ease-in-out"
+      }}
+    >
+      <div className="container-fluid py-4">
+        {/* HERO SECTION - Estilo moderno similar ao da imagem */}
+        <section className="text-center py-5 mb-4">
+          <div className="mb-3">
+            <div style={{ fontSize: "6rem" }}>{weatherEmoji}</div>
+          </div>
+          
+          <div style={{ fontSize: "4.5rem", fontWeight: "300", marginBottom: "1rem" }}>
+            {last ? `${last.temperature.toFixed(1)}°` : "--°"}
+          </div>
+          
+          <div style={{ fontSize: "1.2rem", opacity: 0.9, marginBottom: "0.5rem" }}>
+            {temperature >= 35 ? "Muito Quente" :
+             temperature >= 30 ? "Quente" :
+             temperature >= 25 ? "Agradável" :
+             temperature >= 20 ? "Fresco" :
+             temperature >= 15 ? "Frio" : "Muito Frio"}
+          </div>
+          
+          <div style={{ fontSize: "1rem", opacity: 0.8, marginBottom: "1rem" }}>
+            Máx: {stats?.tMax != null ? `${stats.tMax.toFixed(1)}°` : "--°"} • 
+            Mín: {stats?.tMin != null ? `${stats.tMin.toFixed(1)}°` : "--°"}
+          </div>
+          
+          <div style={{ fontSize: "0.9rem", opacity: 0.7 }}>
+            Catanduva, Brazil
+          </div>
+          
+          <div style={{ fontSize: "0.8rem", opacity: 0.6 }}>
+            Última atualização: {last ? formatTime(last.ts) : "--:--:-- - --/--/----"}
+          </div>
+        </section>
+
+        {/* PREVISÃO SEMANAL - Estilo cards horizontais */}
+        <WeeklyForecast />
+
+        {/* DETALHES METEOROLÓGICOS - Cards glass modernos */}
+        <section className="row g-3 mb-3">
+          {/* Umidade */}
+          <div className="col-12 col-md-6">
+            <div 
+              style={{
+                background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(10px)",
+                borderRadius: "16px",
+                padding: "20px",
+                border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
+                height: "100%"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
+                <div style={{ fontSize: "1.5rem", marginRight: "10px" }}>💧</div>
+                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>UMIDADE</div>
+              </div>
+              <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
+                {last ? `${last.humidity.toFixed(0)}%` : "--%"}
+              </div>
+              <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                Ponto de orvalho: {last ? `${Math.round(last.temperature - 5)}°` : "--°"}
+              </div>
+            </div>
+          </div>
+
+          {/* Vento */}
+          <div className="col-12 col-md-6">
+            <div 
+              style={{
+                background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(10px)",
+                borderRadius: "16px",
+                padding: "20px",
+                border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
+                height: "100%"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
+                <div style={{ fontSize: "1.5rem", marginRight: "10px" }}>🌬️</div>
+                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>VENTO (24H)</div>
+              </div>
+              <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
+                {windStats ? `${windStats.totalWind.toFixed(1)} m/s` : "-- m/s"}
+              </div>
+              <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                {windStats && windStats.windCount > 0 
+                  ? `Média: ${windStats && windStats.windCount > 0 && windStats.avgWind != null
+                  ? `Média: ${windStats.avgWind.toFixed(1)} m/s`
+                  : "Sem dados"}} m/s`
+                  : "Sem dados"}
+              </div>
+            </div>
+          </div>
+
+          {/* Pressão */}
+          <div className="col-12 col-md-6">
+            <div 
+              style={{
+                background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(10px)",
+                borderRadius: "16px",
+                padding: "20px",
+                border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
+                height: "100%"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
+                <div style={{ fontSize: "1.5rem", marginRight: "10px" }}>📊</div>
+                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>PRESSÃO</div>
+              </div>
+              <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
+                {last ? `${Math.round(last.pressure / 100)} hPa` : "-- hPa"}
+              </div>
+              <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                {last && last.pressure > 101325 ? "Alta pressão" : "Pressão normal"}
+              </div>
+            </div>
+          </div>
+
+          {/* Chuva */}
+          <div className="col-12 col-md-6">
+            <div 
+              style={{
+                background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(10px)",
+                borderRadius: "16px",
+                padding: "20px",
+                border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
+                height: "100%"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
+                <div style={{ fontSize: "1.5rem", marginRight: "10px" }}>🌧️</div>
+                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>CHUVA</div>
+              </div>
+              <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
+                {last ? `${last.rain_mm2} mm²` : "-- mm²"}
+              </div>
+              <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                Nas últimas 24h
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* SOL - Nascer e Pôr do sol */}
+        <section className="mb-4">
+          <div 
+            style={{
+              background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+              backdropFilter: "blur(10px)",
+              borderRadius: "16px",
+              padding: "20px",
+              border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`
+            }}
+          >
+            <div className="row">
+              <div className="col-6">
+                <div style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
+                  <div style={{ fontSize: "1.2rem", marginRight: "8px" }}>🌅</div>
+                  <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>NASCER DO SOL</div>
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: "300" }}>
+                  {formatTime(data?.sunriseLabel)}
+                </div>
+              </div>
+              <div className="col-6">
+                <div style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
+                  <div style={{ fontSize: "1.2rem", marginRight: "8px" }}>🌅</div>
+                  <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>PÔR DO SOL</div>
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: "300" }}>
+                  {formatTime(data?.sunsetLabel)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Link para página Sobre */}
+        <div className="text-center mt-4">
+          <a 
+            href="/sobre" 
+            style={{
+              background: isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)",
+              backdropFilter: "blur(10px)",
+              border: `1px solid ${isDay ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.3)"}`,
+              borderRadius: "25px",
+              padding: "12px 24px",
+              color: textColor,
+              textDecoration: "none",
+              fontSize: "0.9rem",
+              fontWeight: "500",
+              transition: "all 0.3s ease"
+            }}
+          >
+            <i className="fa-solid fa-circle-info me-2"></i>
+            Saiba mais sobre este projeto
+          </a>
+        </div>
+      </div>
     </div>
   );
 }

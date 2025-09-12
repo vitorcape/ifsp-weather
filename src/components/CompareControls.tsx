@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import ForecastCompareChart from "@/components/ForecastCompareChart";
-import ChartCard from "@/components/ChartCard";
 
 function TodayYMD(): string {
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const now = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  );
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
@@ -16,13 +17,14 @@ export default function CompareControls() {
   const [dateYMD, setDateYMD] = useState<string>(TodayYMD());
 
   return (
-    <ChartCard
-      title={`Comparativo (Previsão × Medido) — ${dateYMD.split("-").reverse().join("/")}`}
-      icon={<i className="fa-solid fa-arrows-left-right-to-line" />}
-      badge="1 hora"
-    >
-      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <label className="form-label m-0 me-2">Data:</label>
+    <div>
+      <div className="d-flex align-items-center justify-content-between mb-3">
+        <h3 className="mb-0">
+          Comparativo (Previsão × Medido)
+        </h3>
+      </div>
+
+      <div className="d-flex flex-wrap align-items-center gap-2">
         <input
           type="date"
           className="form-control"
@@ -30,10 +32,15 @@ export default function CompareControls() {
           value={dateYMD}
           onChange={(e) => setDateYMD(e.target.value)}
         />
-        <small className="text-muted ms-2">Fuso: America/São Paulo</small>
+        
       </div>
+      <div className="mt-1 mb-4"><div className="fs-6">Fuso: America/São Paulo</div></div>
 
-      <ForecastCompareChart deviceId="esp32-001" refreshMs={60_000} dateYMD={dateYMD} />
-    </ChartCard>
+      <ForecastCompareChart
+        deviceId="esp32-001"
+        refreshMs={60_000}
+        dateYMD={dateYMD}
+      />
+    </div>
   );
 }

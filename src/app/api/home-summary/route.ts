@@ -13,10 +13,19 @@ function startOfTodaySP(): Date {
   now.setHours(0, 0, 0, 0);
   return new Date(now.toLocaleString("en-US", { timeZone: TZ }));
 }
+
+// Nova função para obter timestamp de 24 horas atrás
+function last24HoursSP(): Date {
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+  now.setHours(now.getHours() - 24);
+  return new Date(now.toLocaleString("en-US", { timeZone: TZ }));
+}
+
 function parseHM(isoLocal: string) {
   const [h, m] = isoLocal.slice(11, 16).split(":").map(Number);
   return { h, m };
 }
+
 function toMinutes(h: number, m: number) {
   return h * 60 + m;
 }
@@ -65,10 +74,28 @@ export async function GET() {
 
     const stats = statsAgg[0] ?? { tMin: null, tMax: null, hMin: null, hMax: null, count: 0 };
 
+    // ---- NOVA FUNCIONALIDADE: soma do vento das últimas 24h ----
+    const since24h = last24HoursSP();
+    const windSumAgg = await coll
+      .aggregate([
+        { $match: { ts: { $gte: since24h } } },
+        {
+          $group: {
+            _id: null,
+            totalWind: { $sum: "$wind_ms" },
+            windCount: { $sum: 1 },
+            avgWind: { $avg: "$wind_ms" },
+          },
+        },
+      ])
+      .toArray();
+
+    const windStats = windSumAgg[0] ?? { totalWind: 0, windCount: 0, avgWind: 0 };
+
     // ---- nascer/pôr do sol (strings locais "YYYY-MM-DDTHH:MM") ----
     const sun = await getSunInfo();
-    const sunriseLabel = sun.sunrise.slice(11, 16);
-    const sunsetLabel = sun.sunset.slice(11, 16);
+    const sunriseLabel = sun.sunrise;   // ex: "2025-09-12T05:30:00.000Z"
+    const sunsetLabel  = sun.sunset;
 
     // dia/noite
     const nowSP = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
@@ -78,7 +105,15 @@ export async function GET() {
     const isDay = nowMin >= toMinutes(sh, sm) && nowMin < toMinutes(eh, em);
 
     return NextResponse.json(
-      { last, stats, sunriseLabel, sunsetLabel, isDay, nowISO: nowSP.toISOString() },
+      { 
+        last, 
+        stats, 
+        windStats, // Nova propriedade com dados do vento 24h
+        sunriseLabel, 
+        sunsetLabel, 
+        isDay, 
+        nowISO: nowSP.toISOString() 
+      },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (err) {

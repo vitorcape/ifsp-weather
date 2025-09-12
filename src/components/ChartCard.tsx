@@ -1,4 +1,5 @@
 // src/components/ChartCard.tsx
+
 import { PropsWithChildren, ReactNode } from "react";
 
 export default function ChartCard({
@@ -8,12 +9,17 @@ export default function ChartCard({
   children,
 }: PropsWithChildren<{ title: string; icon?: ReactNode; badge?: ReactNode }>) {
   return (
-    <div className="chart-card h-100">
-      <div className="d-flex align-items-center justify-content-between mb-2">
-        <div className="chart-title h5 mb-0">
-          {icon} <span>{title}</span>
+    <div className="card-glass p-4 h-100">
+      <div className="d-flex align-items-center justify-content-between mb-3">
+        <div className="d-flex align-items-center">
+          {icon}
+          <h5 className="ms-2 mb-0">{title}</h5>
         </div>
-        {badge ? <span className="chart-badge">{badge}</span> : null}
+        {badge && (
+          <span className="badge bg-light text-dark py-1 px-2">
+            {badge}
+          </span>
+        )}
       </div>
       {children}
     </div>

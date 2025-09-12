@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 type Summary = {
   last?: { deviceId: string; temperature: number; humidity: number; pressure: number; rain_mm2: number; wind_ms: number; ts: string };
   stats: { tMin: number | null; tMax: number | null; hMin: number | null; hMax: number | null; count: number };
+  windStats: { totalWind: number; windCount: number; avgWind: number }; // Nova propriedade
   sunriseLabel: string;
   sunsetLabel: string;
   isDay: boolean;
@@ -37,6 +38,7 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
 
   const last = data?.last;
   const stats = data?.stats;
+  const windStats = data?.windStats; // Nova variável
 
   return (
     <>
@@ -75,8 +77,10 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
         </div>
         <div className="col-12 col-md-6 col-lg-3">
           <div className="card-glass p-3 h-100">
-            <i className="fa-solid fa-wind me-2"></i>Vento
-            <div className="fs-3 fw-bold">{last ? `${last.wind_ms} m/s` : "-- m/s"}</div>
+            <i className="fa-solid fa-wind me-2"></i>Vento (24h)
+            <div className="fs-3 fw-bold">
+              {windStats ? `${windStats.totalWind.toFixed(1)} m/s` : "-- m/s"}
+            </div>
           </div>
         </div>
       </section>

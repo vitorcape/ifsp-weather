@@ -17,28 +17,37 @@ export async function GET() {
   const day = todayYMD();
 
   const url =
-    `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
-    `&hourly=temperature_2m,relative_humidity_2m&timezone=${encodeURIComponent(TZ)}` +
-    `&start_date=${day}&end_date=${day}`;
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${LAT}&longitude=${LON}` +
+    `&daily=temperature_2m_max,temperature_2m_min,weathercode` +
+    `&timezone=${encodeURIComponent(TZ)}` +
+    `&start_date=${day}&end_date=${day}`; // só hoje
+  // Para incluir os próximos 6 dias, calcule end_date
+  const end = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+  end.setDate(end.getDate() + 6);
+  const y = end.getFullYear();
+  const m = String(end.getMonth() + 1).padStart(2, "0");
+  const d = String(end.getDate()).padStart(2, "0");
+  const endYMD = `${y}-${m}-${d}`;
 
-  const resp = await fetch(url, { next: { revalidate: 300 } });
+  const fullUrl = url.replace(/end_date=[^&]+/, `end_date=${endYMD}`);
+
+  const resp = await fetch(fullUrl, { next: { revalidate: 300 } });
   if (!resp.ok) return NextResponse.json({ error: "forecast fetch failed" }, { status: 502 });
 
   const json = await resp.json();
-  const hours: string[] = json?.hourly?.time ?? []; // ex: "2025-08-23T01:00"
-  const temps: number[] = json?.hourly?.temperature_2m ?? [];
-  const hums: number[] = json?.hourly?.relative_humidity_2m ?? [];
+  // json.daily: { time: [...], temperature_2m_max: [...], temperature_2m_min: [...], weathercode: [...] }
+  const days: Array<{
+    date: string;
+    tMax: number | null;
+    tMin: number | null;
+    weathercode: number | null;
+  }> = json.daily.time.map((date: string, i: number) => ({
+    date,
+    tMax: Number.isFinite(json.daily.temperature_2m_max[i]) ? json.daily.temperature_2m_max[i] : null,
+    tMin: Number.isFinite(json.daily.temperature_2m_min[i]) ? json.daily.temperature_2m_min[i] : null,
+    weathercode: Number.isFinite(json.daily.weathercode[i]) ? json.daily.weathercode[i] : null,
+  }));
 
-  const items = hours.map((iso: string, i: number) => {
-    const hh = iso.slice(11, 13);          // pega "HH" direto da string local
-    const label = `${hh}:00`;              // "HH:00"
-    return {
-      iso,
-      hourLabel: label,
-      temperature: Number.isFinite(temps[i]) ? temps[i] : null,
-      humidity: Number.isFinite(hums[i]) ? hums[i] : null,
-    };
-  });
-
-  return NextResponse.json({ day, items });
+  return NextResponse.json({ days });
 }
