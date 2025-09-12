@@ -1,13 +1,32 @@
 // src/app/page.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
 import WeeklyForecast from "@/components/WeeklyForecast";
 
 type Summary = {
-  last?: { deviceId: string; temperature: number; humidity: number; pressure: number; rain_mm2: number; wind_ms: number; ts: string };
-  stats: { tMin: number | null; tMax: number | null; hMin: number | null; hMax: number | null; count: number };
-  windStats: { totalWind: number; windCount: number; avgWind: number };
+  last?: {
+    deviceId: string;
+    temperature: number;
+    humidity: number;
+    pressure: number;
+    rain_mm2: number;
+    wind_ms: number;
+    ts: string;
+  };
+  stats: {
+    tMin: number | null;
+    tMax: number | null;
+    hMin: number | null;
+    hMax: number | null;
+    count: number;
+  };
+  windStats: {
+    totalWind: number;
+    windCount: number;
+    avgWind: number;
+  };
   sunriseLabel: string;
   sunsetLabel: string;
   isDay: boolean;
@@ -17,97 +36,79 @@ type Summary = {
 function formatTime(input?: string | Date) {
   if (!input) return "--:--:-- - --/--/----";
   const dt = typeof input === "string" ? new Date(input) : input;
-  return dt.toLocaleTimeString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  }) + " - " +
-  dt.toLocaleDateString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
+  return (
+    dt.toLocaleTimeString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }) +
+    " - " +
+    dt.toLocaleDateString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+  );
 }
 
-// Função para determinar o gradiente baseado na temperatura e hora
-function getBackgroundGradient(temperature: number, isDay: boolean, currentHour: number): string {
-  // Temperaturas de referência
-  const veryHot = 35; // 35°C+
-  const hot = 30;     // 30-35°C
-  const warm = 25;    // 25-30°C
-  const cool = 20;    // 20-25°C
-  const cold = 15;    // 15-20°C
+function getBackgroundGradient(
+  temperature: number,
+  isDay: boolean,
+  currentHour: number
+): string {
+  const veryHot = 35;
+  const hot = 30;
+  const warm = 25;
+  const cool = 20;
+  const cold = 15;
 
   if (!isDay) {
-    // Noite - tons escuros com variação baseada na temperatura
     if (temperature >= hot) {
-      return "linear-gradient(135deg, #1a1a2e 0%, #16213e 30%, #0f3460 70%, #533483 100%)"; // Noite quente - roxo escuro
+      return "linear-gradient(135deg, #1a1a2e 0%, #16213e 30%, #0f3460 70%, #533483 100%)";
     } else if (temperature >= warm) {
-      return "linear-gradient(135deg, #0c0c1e 0%, #1a1a2e 50%, #16213e 100%)"; // Noite morna - azul escuro
+      return "linear-gradient(135deg, #0c0c1e 0%, #1a1a2e 50%, #16213e 100%)";
     } else if (temperature >= cool) {
-      return "linear-gradient(135deg, #000428 0%, #004e92 100%)"; // Noite fresca - azul profundo
+      return "linear-gradient(135deg, #000428 0%, #004e92 100%)";
     } else {
-      return "linear-gradient(135deg, #232526 0%, #414345 100%)"; // Noite fria - cinza escuro
+      return "linear-gradient(135deg, #232526 0%, #414345 100%)";
     }
   } else {
-    // Dia - cores baseadas na temperatura e hora
     if (currentHour >= 6 && currentHour < 8) {
-      // Nascer do sol - tons dourados
       return "linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%)";
     } else if (currentHour >= 17 && currentHour < 19) {
-      // Pôr do sol - tons alaranjados
       return "linear-gradient(135deg, #ff6b6b 0%, #ffa726 50%, #ffcc02 100%)";
     } else if (temperature >= veryHot) {
-      // Muito quente - alaranjado/vermelho intenso
       return "linear-gradient(135deg, #ff6b6b 0%, #ffa726 30%, #ffcc02 60%, #fff176 100%)";
     } else if (temperature >= hot) {
-      // Quente - amarelo/alaranjado
       return "linear-gradient(135deg, #ffa726 0%, #ffcc02 50%, #fff176 100%)";
     } else if (temperature >= warm) {
-      // Morno - amarelo suave
       return "linear-gradient(135deg, #ffcc02 0%, #fff176 50%, #f0f4c3 100%)";
     } else if (temperature >= cool) {
-      // Agradável - azul claro
       return "linear-gradient(135deg, #81c784 0%, #64b5f6 50%, #90caf9 100%)";
     } else if (temperature >= cold) {
-      // Frio - azul
       return "linear-gradient(135deg, #42a5f5 0%, #64b5f6 50%, #90caf9 100%)";
     } else {
-      // Muito frio - azul intenso
       return "linear-gradient(135deg, #1976d2 0%, #42a5f5 50%, #64b5f6 100%)";
     }
   }
 }
 
-// Função para determinar a cor do texto baseada no fundo
 function getTextColor(isDay: boolean, temperature: number): string {
-  if (!isDay) {
-    return "#ffffff"; // Texto branco para fundos escuros
-  }
-  
-  if (temperature >= 25) {
-    return "#333333"; // Texto escuro para fundos claros/quentes
-  } else {
-    return "#ffffff"; // Texto branco para fundos frios
-  }
+  if (!isDay) return "#ffffff";
+  return temperature >= 25 ? "#333333" : "#ffffff";
 }
 
-// Função para obter emoji do clima baseado na temperatura e hora
 function getWeatherEmoji(temperature: number, isDay: boolean): string {
-  if (!isDay) {
-    if (temperature >= 25) return "🌙"; // Noite quente
-    return "🌃"; // Noite normal
-  }
-  
-  if (temperature >= 35) return "🔥"; // Muito quente
-  if (temperature >= 30) return "☀️"; // Quente  
-  if (temperature >= 25) return "🌤️"; // Morno
-  if (temperature >= 20) return "⛅"; // Agradável
-  if (temperature >= 15) return "🌥️"; // Frio
-  return "❄️"; // Muito frio
+  if (!isDay) return temperature >= 25 ? "🌙" : "🌃";
+  if (temperature >= 35) return "🔥";
+  if (temperature >= 30) return "☀️";
+  if (temperature >= 25) return "🌤️";
+  if (temperature >= 20) return "⛅";
+  if (temperature >= 15) return "🌥️";
+  return "❄️";
 }
 
 export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number }) {

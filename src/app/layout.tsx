@@ -7,8 +7,8 @@ import Link from "next/link";
 import NowBadgeClient from "@/components/NowBadgeClient";
 
 export const metadata: Metadata = {
-  title: "Casa do Vitor Capelli",
-  description: "Monitoramento residencial — ESP32 + DHT22",
+  title: "Estação Meteorológica",
+  description: "Projeto IFSP Catanduva",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
