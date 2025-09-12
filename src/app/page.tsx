@@ -40,7 +40,6 @@ function getBackgroundGradient(temperature: number, isDay: boolean, currentHour:
   const warm = 25;    // 25-30°C
   const cool = 20;    // 20-25°C
   const cold = 15;    // 15-20°C
-  const veryCold = 10; // <15°C
 
   if (!isDay) {
     // Noite - tons escuros com variação baseada na temperatura
