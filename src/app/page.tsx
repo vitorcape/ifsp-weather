@@ -113,47 +113,57 @@ function getWeatherEmoji(temperature: number, isDay: boolean): string {
 
 export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number }) {
   const [data, setData] = useState<Summary | null>(null);
+  const [background, setBackground] = useState<string>("");
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     let alive = true;
     async function load() {
       const res = await fetch("/api/home-summary", { cache: "no-store" });
       const json: Summary = await res.json();
-      if (alive) setData(json);
+      if (!alive) return;
+      setData(json);
+
+      const temp = json.last?.temperature ?? 20;
+      const isDay = json.isDay;
+      const hour = new Date().getHours();
+      setBackground(getBackgroundGradient(temp, isDay, hour));
     }
     load();
     const id = setInterval(load, refreshMs);
-    return () => { alive = false; clearInterval(id); };
-  }, [refreshMs]);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [hydrated, refreshMs]);
+
+  if (!hydrated) {
+    return <div className="min-vh-100 w-100" />;
+  }
 
   const last = data?.last;
   const stats = data?.stats;
   const windStats = data?.windStats;
-  
-  // Calcular hora atual
-  const currentHour = new Date().getHours();
-  const temperature = last?.temperature || 20;
-  const isDay = data?.isDay || true;
-  
-  // Determinar estilos dinâmicos
-  const backgroundGradient = getBackgroundGradient(temperature, isDay, currentHour);
-  const textColor = getTextColor(isDay, temperature);
-  const weatherEmoji = getWeatherEmoji(temperature, isDay);
 
   return (
-    <div 
+    <div
       style={{
-        background: backgroundGradient,
+        background,
+        transition: "background 0.8s ease",
         minHeight: "100vh",
-        color: textColor,
-        transition: "all 0.8s ease-in-out"
+        color: getTextColor(data?.isDay ?? true, data?.last?.temperature ?? 20),
       }}
     >
       <div className="container-fluid py-4">
         {/* HERO SECTION - Estilo moderno similar ao da imagem */}
         <section className="text-center py-5 mb-4">
           <div className="mb-3">
-            <div style={{ fontSize: "6rem" }}>{weatherEmoji}</div>
+            <div style={{ fontSize: "6rem" }}>{getWeatherEmoji(data?.last?.temperature ?? 20, data?.isDay ?? true)}</div>
           </div>
           
           <div style={{ fontSize: "4.5rem", fontWeight: "300", marginBottom: "1rem" }}>
@@ -199,11 +209,11 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
           <div className="col-12 col-md-6">
             <div 
               style={{
-                background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                background: data?.isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
                 backdropFilter: "blur(10px)",
                 borderRadius: "16px",
                 padding: "20px",
-                border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
+                border: `1px solid ${data?.isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
                 height: "100%"
               }}
             >
@@ -224,11 +234,11 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
           <div className="col-12 col-md-6">
             <div 
               style={{
-                background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                background: data?.isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
                 backdropFilter: "blur(10px)",
                 borderRadius: "16px",
                 padding: "20px",
-                border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
+                border: `1px solid ${data?.isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
                 height: "100%"
               }}
             >
@@ -253,11 +263,11 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
           <div className="col-12 col-md-6">
             <div 
               style={{
-                background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                background: data?.isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
                 backdropFilter: "blur(10px)",
                 borderRadius: "16px",
                 padding: "20px",
-                border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
+                border: `1px solid ${data?.isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
                 height: "100%"
               }}
             >
@@ -278,11 +288,11 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
           <div className="col-12 col-md-6">
             <div 
               style={{
-                background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+                background: data?.isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
                 backdropFilter: "blur(10px)",
                 borderRadius: "16px",
                 padding: "20px",
-                border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
+                border: `1px solid ${data?.isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`,
                 height: "100%"
               }}
             >
@@ -304,11 +314,11 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
         <section className="mb-4">
           <div 
             style={{
-              background: isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
+              background: data?.isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
               backdropFilter: "blur(10px)",
               borderRadius: "16px",
               padding: "20px",
-              border: `1px solid ${isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`
+              border: `1px solid ${data?.isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)"}`
             }}
           >
             <div className="row">
@@ -339,12 +349,12 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
           <a 
             href="/sobre" 
             style={{
-              background: isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)",
+              background: data?.isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)",
               backdropFilter: "blur(10px)",
-              border: `1px solid ${isDay ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.3)"}`,
+              border: `1px solid ${data?.isDay ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.3)"}`,
               borderRadius: "25px",
               padding: "12px 24px",
-              color: textColor,
+              color: getTextColor(data?.isDay ?? true, data?.last?.temperature ?? 20),
               textDecoration: "none",
               fontSize: "0.9rem",
               fontWeight: "500",
