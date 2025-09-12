@@ -161,11 +161,19 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
           </div>
           
           <div style={{ fontSize: "1.2rem", opacity: 0.9, marginBottom: "0.5rem" }}>
-            {temperature >= 35 ? "Muito Quente" :
-             temperature >= 30 ? "Quente" :
-             temperature >= 25 ? "Agradável" :
-             temperature >= 20 ? "Fresco" :
-             temperature >= 15 ? "Frio" : "Muito Frio"}
+            {last
+            ? last.temperature >= 35
+              ? "Muito Quente"
+              : last.temperature >= 30
+              ? "Quente"
+              : last.temperature >= 25
+              ? "Agradável"
+              : last.temperature >= 20
+              ? "Fresco"
+              : last.temperature >= 15
+              ? "Frio"
+              : "Muito Frio"
+            : "--"}
           </div>
           
           <div style={{ fontSize: "1rem", opacity: 0.8, marginBottom: "1rem" }}>
