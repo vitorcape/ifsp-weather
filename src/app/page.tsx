@@ -4,6 +4,8 @@
 
 import { useEffect, useState } from "react";
 import WeeklyForecast from "@/components/WeeklyForecast";
+import dynamic from "next/dynamic";
+const WeatherAlerts = dynamic(() => import("@/components/WeatherAlerts"), { ssr: false });
 
 type Summary = {
   last?: {
@@ -31,6 +33,7 @@ type Summary = {
   sunsetLabel: string;
   isDay: boolean;
   nowISO: string;
+  rainLast24h?: number;
 };
 
 function formatTime(input?: string | Date) {
@@ -244,17 +247,13 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
             >
               <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
                 <div style={{ fontSize: "1.5rem", marginRight: "10px" }}>🌬️</div>
-                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>VENTO (24H)</div>
+                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>VENTO</div>
               </div>
               <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
-                {windStats ? `${windStats.totalWind.toFixed(1)} m/s` : "-- m/s"}
+                {windStats ? `${windStats.avgWind.toFixed(1)} km/h` : "-- km/h"}
               </div>
               <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                {windStats && windStats.windCount > 0 
-                  ? `Média: ${windStats && windStats.windCount > 0 && windStats.avgWind != null
-                  ? `Média: ${windStats.avgWind.toFixed(1)} m/s`
-                  : "Sem dados"}} m/s`
-                  : "Sem dados"}
+                Nas últimas 24h
               </div>
             </div>
           </div>
@@ -301,7 +300,7 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
                 <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>CHUVA</div>
               </div>
               <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
-                {last ? `${last.rain_mm2} mm²` : "-- mm²"}
+                {data?.rainLast24h != null ? `${data.rainLast24h.toFixed(1)} mm` : "-- mm"}
               </div>
               <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
                 Nas últimas 24h
@@ -343,6 +342,10 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
             </div>
           </div>
         </section>
+
+        <div className="mt-4">
+          <WeatherAlerts uf="SP" city="3511102" isDay={data?.isDay ?? true} />
+        </div>
 
         {/* Link para página Sobre */}
         <div className="text-center mt-4">

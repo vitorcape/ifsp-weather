@@ -34,7 +34,7 @@ export async function GET(req: Request) {
     const db = await getDb();
     const coll = db.collection("readings");
 
-    // 💡 TZ direto no Mongo: trunca o timestamp para o dia em SP e compara com a data passada
+    // 🔎 Trunca o timestamp para o dia (fuso SP) e agrega estatísticas do dia
     const targetMidnightSP = dateFromYMD_SP(dateStr);
     const agg = await coll
       .aggregate([
@@ -57,24 +57,61 @@ export async function GET(req: Request) {
         {
           $group: {
             _id: null,
+
+            // já existiam
             tMin: { $min: "$temperature" },
             tMax: { $max: "$temperature" },
             hAvg: { $avg: "$humidity" },
             count: { $sum: 1 },
+
+            // ✅ novos campos (ajuste os nomes se no seu documento forem diferentes)
+            pAvg: { $avg: "$pressure" },     // pressão média (Pa)
+            rainMm: { $sum: "$rain_mm2" },   // chuva acumulada (mm) — se sua coluna já for mm
+            windAvg: { $avg: "$wind_ms" },   // vento médio (m/s)
+            windMax: { $max: "$wind_ms" },   // rajada máxima (m/s)
+          },
+        },
+        // deixa números com 2 casas onde faz sentido (sem alterar nulos)
+        {
+          $project: {
+            _id: 0,
+            tMin: 1,
+            tMax: 1,
+            hAvg: 1,
+            count: 1,
+            pAvg: 1,
+            rainMm: 1,
+            windAvg: 1,
+            windMax: 1,
           },
         },
       ])
       .toArray();
 
     const stats =
-      agg[0] ?? ({ tMin: null, tMax: null, hAvg: null, count: 0 } as {
+      (agg[0] as {
         tMin: number | null;
         tMax: number | null;
         hAvg: number | null;
         count: number;
-      });
 
-    // ☀️/🌙 via Open‑Meteo para a MESMA data
+        pAvg?: number | null;
+        rainMm?: number | null;
+        windAvg?: number | null;
+        windMax?: number | null;
+      }) ??
+      ({
+        tMin: null,
+        tMax: null,
+        hAvg: null,
+        count: 0,
+        pAvg: null,
+        rainMm: null,
+        windAvg: null,
+        windMax: null,
+      } as const);
+
+    // ☀️/🌙 via Open-Meteo para a MESMA data
     const sun = await getSunInfoFor(dateStr);
     const sunriseLabel = sun.sunrise.slice(11, 16); // "HH:MM"
     const sunsetLabel = sun.sunset.slice(11, 16);

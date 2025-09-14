@@ -12,6 +12,7 @@
     "@fortawesome/fontawesome-free": "^7.0.1",
     "bootstrap": "^5.3.8",
     "date-fns": "^4.1.0",
+    "fast-xml-parser": "^5.2.5",
     "mongodb": "^6.19.0",
     "next": "15.5.2",
     "react": "19.1.0",

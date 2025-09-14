@@ -88,14 +88,14 @@ export default function LogTable({ refreshMs = 30000 }: { refreshMs?: number }) 
               <th>Umidade (%)</th>
               <th>Pressão (Pa)</th>
               <th>Chuva (mm²)</th>
-              <th>Vento (m/s)</th>
+              <th>Vento (km/h)</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="text-center">Carregando…</td></tr>
+              <tr><td colSpan={8} className="text-center">Carregando…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="text-center">Nenhum registro</td></tr>
+              <tr><td colSpan={8} className="text-center">Nenhum registro</td></tr>
             ) : (
               filtered.map((r, i) => (
                 <tr key={i}>
