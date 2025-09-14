@@ -30,6 +30,7 @@ function nowInSP(): Date {
   return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_req: Request) {
   try {
     const db = await getDb();

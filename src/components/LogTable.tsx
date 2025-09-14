@@ -17,7 +17,7 @@ type Reading = {
 
 export default function LogTable({ refreshMs = 30000 }: { refreshMs?: number }) {
   const [rows, setRows] = useState<Reading[]>([]);
-  const [filterId, setFilterId] = useState("");
+  const [filterId] = useState<string>("");
   const [filterDate, setFilterDate] = useState(""); // "YYYY-MM-DD"
   const [loading, setLoading] = useState(true);
 
