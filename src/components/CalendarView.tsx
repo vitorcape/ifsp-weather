@@ -18,8 +18,8 @@ type DaySummary = {
     // CAMPO OPCIONAL (se sua API já expõe; se não, mostramos "—")
     pAvg?: number | null;       // pressão média (Pa)
     rainMm?: number | null;     // chuva acumulada (mm)
-    windAvg?: number | null;    // vento médio (m/s)
-    windMax?: number | null;    // rajada máx (m/s)
+    windAvg?: number | null;    // vento médio (km/h)
+    windMax?: number | null;    // rajada máx (km/h)
   };
 };
 
@@ -291,9 +291,9 @@ export default function CalendarView() {
                   <div className="p-2 rounded" style={{ background: isDay ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.08)", border: `1px solid ${cardBor}` }}>
                     <div className="small text-uppercase fw-semibold" style={{ color: textSec }}>🌬️ Vento</div>
                     <div className="fs-5 fw-bold" style={{ color: textPri }}>
-                      {windAvg != null ? `Média: ${windAvg.toFixed(1)} m/s` : "Média: — m/s"}
+                      {windAvg != null ? `Média: ${windAvg.toFixed(1)} km/h` : "Média: — km/h"}
                       {" · "}
-                      {windMax != null ? `Rajada: ${windMax.toFixed(1)} m/s` : "Rajada: — m/s"}
+                      {windMax != null ? `Rajada: ${windMax.toFixed(1)} km/h` : "Rajada: — km/h"}
                     </div>
                   </div>
                 </div>

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body className="bg-sky text-white d-flex flex-column min-vh-100">
+      <body suppressHydrationWarning className="bg-sky text-white d-flex flex-column min-vh-100">
         {/* NAV */}
         <nav className="navbar navbar-expand-lg navbar-translucent border-0">
           <div className="container d-flex align-items-center">
@@ -31,8 +31,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
               <Link className="btn btn-sm btn-outline-light rounded-pill px-3" href="/calendario">
                 <i className="fa-solid fa-calendar-days me-2"></i>Calendário
+              </Link><Link className="btn btn-sm btn-outline-light rounded-pill px-3" href="/dados">
+                <i className="fa-solid fa-database me-2"></i>Dados
               </Link><Link className="btn btn-sm btn-outline-light rounded-pill px-3" href="/log">
-                <i className="fa-solid fa-database me-2"></i>Logs
+                <i className="fa-solid fa-table me-2"></i>Logs
               </Link>
             </div>
           </div>

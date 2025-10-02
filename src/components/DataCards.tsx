@@ -103,7 +103,7 @@ export default function DataCards({ refreshMs = 15000 }: { refreshMs?: number })
             icon = "fa-wind";
             label = "Vento";
             value = data.wind_ms.toFixed(1);
-            unit = "m/s";
+            unit = "km/h";
             break;
         }
         return (

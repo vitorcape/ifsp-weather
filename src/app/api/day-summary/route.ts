@@ -67,8 +67,8 @@ export async function GET(req: Request) {
             // ✅ novos campos (ajuste os nomes se no seu documento forem diferentes)
             pAvg: { $avg: "$pressure" },     // pressão média (Pa)
             rainMm: { $sum: "$rain_mm2" },   // chuva acumulada (mm) — se sua coluna já for mm
-            windAvg: { $avg: "$wind_ms" },   // vento médio (m/s)
-            windMax: { $max: "$wind_ms" },   // rajada máxima (m/s)
+            windAvg: { $avg: "$wind_ms" },   // vento médio (km/h)
+            windMax: { $max: "$wind_ms" },   // rajada máxima (km/h)
           },
         },
         // deixa números com 2 casas onde faz sentido (sem alterar nulos)

@@ -27,7 +27,7 @@ const VARIABLES: Record<Variable, { label: string; unit: string; color: string; 
   humidity:    { label: "Umidade",    unit: "%",   color: "#0dcaf0", icon: "fa-droplet" },
   pressure:    { label: "Pressão",    unit: "hPa", color: "#ffc107", icon: "fa-gauge" },
   rain_mm2:    { label: "Chuva",      unit: "mm²", color: "#198754", icon: "fa-cloud-rain" },
-  wind_ms:     { label: "Vento",      unit: "m/s", color: "#6c757d", icon: "fa-wind" }
+  wind_ms:     { label: "Vento",      unit: "km/h", color: "#6c757d", icon: "fa-wind" }
 };
 
 const TIME_SCALES = {

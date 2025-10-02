@@ -79,7 +79,7 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
           <div className="card-glass p-3 h-100">
             <i className="fa-solid fa-wind me-2"></i>Vento (24h)
             <div className="fs-3 fw-bold">
-              {windStats ? `${windStats.totalWind.toFixed(1)} m/s` : "-- m/s"}
+              {windStats ? `${windStats.totalWind.toFixed(1)} km/h` : "-- km/h"}
             </div>
           </div>
         </div>

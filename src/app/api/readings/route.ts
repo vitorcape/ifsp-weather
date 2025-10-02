@@ -1,46 +1,59 @@
-import { NextRequest, NextResponse } from "next/server";
+// src/app/api/readings/route.ts
+import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const deviceId = searchParams.get("deviceId") ?? undefined;
-  const since = searchParams.get("since");
-  const until = searchParams.get("until");
-  const limit = Number(searchParams.get("limit") ?? 500);
-
-  const query: Record<string, unknown> = {};
-  if (deviceId) query.deviceId = deviceId;
-  if (since || until) {
-    const range: Record<string, Date> = {};
-    if (since) range.$gte = new Date(since);
-    if (until) range.$lt = new Date(until);
-    query.ts = range;
-  }
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+  const deviceId = searchParams.get("deviceId") || undefined;
+  const limit = Number(searchParams.get("limit") || "500");
+  const shape = searchParams.get("shape"); // "object" -> { items: [...] }, default -> array
 
   const db = await getDb();
-  const cursor = db
-    .collection("readings")
-    .find(query)
-    .sort([["ts", limit === 1 ? -1 : 1]])
-    .limit(limit);
+  const coll = db.collection("readings");
 
-  const docs = await cursor.toArray();
-  const records = limit === 1 ? docs : docs;
+  const q: Record<string, any> = {};
+  if (from || to) {
+    q.ts = {};
+    if (from) q.ts.$gte = new Date(from);
+    if (to) q.ts.$lte = new Date(to);
+  }
+  if (deviceId) q.deviceId = deviceId;
 
-  return NextResponse.json(
-    records.map(d => ({
-      deviceId: d.deviceId as string,
-      temperature: Number(d.temperature),
-      temperature_dht: Number(d.temperature_dht),
-      humidity: Number(d.humidity),
-      pressure: Number(d.pressure),
-      rain_mm2: Number(d.rain_mm2),
-      wind_ms: Number(d.wind_ms),
-      ts: (d.ts as Date).toISOString(),
-    })),
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  const docs = await coll
+    .find(q, {
+      projection: {
+        deviceId: 1,
+        temperature: 1,
+        humidity: 1,
+        pressure: 1,
+        rain_mm2: 1,
+        wind_ms: 1,
+        ts: 1,
+      },
+    })
+    .sort({ ts: -1 })
+    .limit(limit)
+    .toArray();
+
+  const rows = docs.map((d: any) => ({
+    _id: String(d._id),
+    deviceId: d.deviceId ?? "",
+    temperature: d.temperature ?? null,
+    humidity: d.humidity ?? null,
+    pressure: d.pressure ?? null,
+    rain_mm2: d.rain_mm2 ?? null,
+    wind_ms: d.wind_ms ?? null,
+    ts: new Date(d.ts).toISOString(),
+  }));
+
+  // ✅ Padrão: array (retrocompatível)
+  // ✅ Opcional: ?shape=object -> { items: [...] }
+  const body = shape === "object" ? { items: rows } : rows;
+
+  return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
 }
