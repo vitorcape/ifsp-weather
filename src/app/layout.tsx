@@ -51,7 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Estação Meteorológica • IFSP Catanduva
             </div>
             <div className="text-white-50">
-              © {new Date().getFullYear()} IFSP Weather • versão 3.0.4
+              © {new Date().getFullYear()} IFSP Weather • versão 3.0.5
             </div>
           </div>
         </footer>
