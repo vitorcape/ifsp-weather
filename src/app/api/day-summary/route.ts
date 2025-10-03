@@ -114,10 +114,11 @@ export async function GET(req: Request) {
       },
       { headers: { "Cache-Control": "no-store" } }
     );
-  } catch (e: any) {
-  console.error("[day-summary] erro:", e?.stack || e);
+  } catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  console.error("[day-summary] erro:", e);
   return NextResponse.json(
-    { error: "day-summary failed", details: String(e?.message || e) },
+    { error: "day-summary failed", details: msg },
     { status: 500 }
   );
 }
