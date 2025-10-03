@@ -1,73 +1,127 @@
-// src/app/api/readings/[id]/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Params = { params: { id: string } };
+type RouteContext =
+  | { params: { id: string } }
+  | { params: Promise<{ id: string }> };
 
-type ReadingUpdate = {
-  deviceId?: string | null;
-  temperature?: number | null;
-  humidity?: number | null;
-  pressure?: number | null;
-  rain_mm2?: number | null;
-  wind_ms?: number | null;
-  ts?: string | null; // ISO
-};
-
-function sanitizeUpdate(o: unknown): ReadingUpdate {
-  if (typeof o !== "object" || o === null) return {};
-  const a = o as Record<string, unknown>;
-
-  const ensureNumOrNull = (v: unknown) =>
-    typeof v === "number" || v === null ? v : undefined;
-
-  return {
-    deviceId: typeof a.deviceId === "string" ? a.deviceId : a.deviceId === null ? null : undefined,
-    temperature: ensureNumOrNull(a.temperature),
-    humidity: ensureNumOrNull(a.humidity),
-    pressure: ensureNumOrNull(a.pressure),
-    rain_mm2: ensureNumOrNull(a.rain_mm2),
-    wind_ms: ensureNumOrNull(a.wind_ms),
-    ts: typeof a.ts === "string" ? a.ts : a.ts === null ? null : undefined,
-  };
+function isPromise<T>(x: unknown): x is Promise<T> {
+  return typeof x === "object" && x !== null && "then" in (x as object);
 }
 
-export async function PATCH(req: Request, { params }: Params) {
-  const id = params.id;
-  if (!ObjectId.isValid(id)) return NextResponse.json({ error: "invalid id" }, { status: 400 });
-
-  const bodyUnknown: unknown = await req.json();
-  const upd = sanitizeUpdate(bodyUnknown);
-
-  const $set: Record<string, unknown> = {};
-  if (upd.deviceId !== undefined) $set.deviceId = upd.deviceId;
-  if (upd.temperature !== undefined) $set.temperature = upd.temperature;
-  if (upd.humidity !== undefined) $set.humidity = upd.humidity;
-  if (upd.pressure !== undefined) $set.pressure = upd.pressure;
-  if (upd.rain_mm2 !== undefined) $set.rain_mm2 = upd.rain_mm2;
-  if (upd.wind_ms !== undefined) $set.wind_ms = upd.wind_ms;
-  if (upd.ts !== undefined) $set.ts = upd.ts ? new Date(upd.ts) : null;
-
-  if (Object.keys($set).length === 0) {
-    return NextResponse.json({ ok: true, modified: 0 });
+async function getIdFromContext(ctx: RouteContext): Promise<string> {
+  const raw = (ctx as RouteContext).params as unknown;
+  if (isPromise<{ id: string }>(raw)) {
+    const p = await raw;
+    return p.id;
   }
-
-  const db = await getDb();
-  const coll = db.collection("readings");
-  const res = await coll.updateOne({ _id: new ObjectId(id) }, { $set });
-
-  return NextResponse.json({ ok: true, modified: res.modifiedCount });
+  return (raw as { id: string }).id;
 }
 
-export async function DELETE(_req: Request, { params }: Params) {
-  const id = params.id;
-  if (!ObjectId.isValid(id)) return NextResponse.json({ error: "invalid id" }, { status: 400 });
-  const db = await getDb();
-  const coll = db.collection("readings");
-  const res = await coll.deleteOne({ _id: new ObjectId(id) });
-  return NextResponse.json({ ok: true, deleted: res.deletedCount });
+function isAuthorized(req: NextRequest): boolean {
+  const headerToken = req.headers.get("x-admin-token") ?? "";
+  const serverToken =
+    process.env.ADMIN_TOKEN ??
+    process.env.NEXT_PUBLIC_ADMIN_TOKEN ??
+    "";
+  return !!serverToken && headerToken === serverToken;
+}
+
+// GET /api/readings/[id]
+export async function GET(
+  _req: NextRequest,
+  ctx: RouteContext
+): Promise<NextResponse> {
+  try {
+    const id = await getIdFromContext(ctx);
+    const db = await getDb();
+    const coll = db.collection("readings");
+    const doc = await coll.findOne({ _id: new ObjectId(id) });
+    if (!doc) {
+      return NextResponse.json({ error: "not found" }, { status: 404 });
+    }
+    return NextResponse.json(doc, { headers: { "Cache-Control": "no-store" } });
+  } catch (e) {
+    return NextResponse.json(
+      { error: "readings/[id] GET failed" },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH /api/readings/[id]
+export async function PATCH(
+  req: NextRequest,
+  ctx: RouteContext
+): Promise<NextResponse> {
+  try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const id = await getIdFromContext(ctx);
+    const body = (await req.json()) as Partial<{
+      deviceId: string | null;
+      temperature: number | null;
+      humidity: number | null;
+      pressure: number | null;
+      rain_mm2: number | null;
+      wind_ms: number | null;
+      ts: string | null;
+    }>;
+
+    const update: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(body)) {
+      if (v === undefined) continue;
+      update[k] = v;
+    }
+
+    const db = await getDb();
+    const coll = db.collection("readings");
+    const res = await coll.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: update }
+    );
+
+    return NextResponse.json(
+      { ok: true, modified: res.modifiedCount },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (e) {
+    return NextResponse.json(
+      { error: "readings/[id] PATCH failed" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/readings/[id]
+export async function DELETE(
+  req: NextRequest,
+  ctx: RouteContext
+): Promise<NextResponse> {
+  try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const id = await getIdFromContext(ctx);
+    const db = await getDb();
+    const coll = db.collection("readings");
+    const res = await coll.deleteOne({ _id: new ObjectId(id) });
+
+    return NextResponse.json(
+      { ok: true, deleted: res.deletedCount },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch (e) {
+    return NextResponse.json(
+      { error: "readings/[id] DELETE failed" },
+      { status: 500 }
+    );
+  }
 }

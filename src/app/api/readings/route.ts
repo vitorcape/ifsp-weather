@@ -1,98 +1,105 @@
-// src/app/api/readings/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Reading = {
-  _id?: string;
-  deviceId: string;
-  temperature: number | null;
-  humidity: number | null;
-  pressure: number | null;
-  rain_mm2: number | null;
-  wind_ms: number | null;
-  ts: string; // ISO
-};
-
-type ApiListResponse = Reading[] | { items: Reading[] };
-
-function isReading(obj: unknown): obj is Reading {
-  if (typeof obj !== "object" || obj === null) return false;
-  const o = obj as Record<string, unknown>;
-  // validações mínimas
-  return typeof o.deviceId === "string" && typeof o.ts === "string";
+function isAuthorized(req: NextRequest): boolean {
+  const headerToken = req.headers.get("x-admin-token") ?? "";
+  const serverToken =
+    process.env.ADMIN_TOKEN ??
+    process.env.NEXT_PUBLIC_ADMIN_TOKEN ??
+    "";
+  return !!serverToken && headerToken === serverToken;
 }
 
-function toReadingPartial(obj: unknown): Partial<Reading> {
-  if (typeof obj !== "object" || obj === null) return {};
-  const o = obj as Record<string, unknown>;
-  const pickNumberOrNull = (v: unknown) =>
-    typeof v === "number" || v === null ? v : undefined;
+// GET /api/readings?from=...&to=...&deviceId=...&limit=...&as=object|array
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  try {
+    const { searchParams } = new URL(req.url);
+    const fromISO = searchParams.get("from");
+    const toISO = searchParams.get("to");
+    const deviceId = searchParams.get("deviceId")?.trim();
+    const limit = Math.max(1, Math.min(5000, Number(searchParams.get("limit") ?? 500)));
+    const as = (searchParams.get("as") || "array").toLowerCase(); // 🔁 compat: padrão "array"
 
-  return {
-    deviceId: typeof o.deviceId === "string" ? o.deviceId : undefined,
-    temperature: pickNumberOrNull(o.temperature),
-    humidity: pickNumberOrNull(o.humidity),
-    pressure: pickNumberOrNull(o.pressure),
-    rain_mm2: pickNumberOrNull(o.rain_mm2),
-    wind_ms: pickNumberOrNull(o.wind_ms),
-    ts: typeof o.ts === "string" ? o.ts : undefined,
-  };
-}
+    const q: Record<string, unknown> = {};
+    if (fromISO || toISO) {
+      q.ts = {};
+      if (fromISO) (q.ts as Record<string, Date>).$gte = new Date(fromISO);
+      if (toISO) (q.ts as Record<string, Date>).$lte = new Date(toISO);
+    }
+    if (deviceId) q.deviceId = deviceId;
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const from = searchParams.get("from");
-  const to = searchParams.get("to");
-  const deviceId = searchParams.get("deviceId") || undefined;
+    const db = await getDb();
+    const coll = db.collection("readings");
 
-  const db = await getDb();
-  const coll = db.collection("readings");
+    const cursor = coll
+      .find(q)
+      .sort({ ts: -1 })
+      .limit(limit);
 
-  const query: Record<string, unknown> = {};
-  if (from || to) {
-    query.ts = {
-      ...(from ? { $gte: new Date(from) } : {}),
-      ...(to ? { $lte: new Date(to) } : {}),
-    };
-  }
-  if (deviceId) query.deviceId = deviceId;
+    const items = await cursor.toArray();
 
-  const items = (await coll
-    .find(query, { projection: { _id: 1, deviceId: 1, temperature: 1, humidity: 1, pressure: 1, rain_mm2: 1, wind_ms: 1, ts: 1 } })
-    .sort({ ts: -1 })
-    .toArray()) as unknown as Reading[];
-
-  // devolva SEMPRE array puro ou objeto {items}, mas seja consistente com seus componentes
-  return NextResponse.json({ items } satisfies ApiListResponse, {
-    headers: { "Cache-Control": "no-store" },
-  });
-}
-
-export async function POST(req: Request) {
-  const payloadUnknown: unknown = await req.json();
-  const partial = toReadingPartial(payloadUnknown);
-
-  if (!partial.deviceId || !partial.ts) {
+    // 🔁 Retrocompatibilidade:
+    // - padrão: retorna array (o que sua página de Gráficos espera)
+    // - se ?as=object => retorna { items }
+    if (as === "object") {
+      return NextResponse.json(
+        { items },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+    // default: array
+    return NextResponse.json(items, { headers: { "Cache-Control": "no-store" } });
+  } catch {
     return NextResponse.json(
-      { error: "deviceId e ts são obrigatórios" },
-      { status: 400 }
+      { error: "readings GET failed" },
+      { status: 500 }
     );
   }
+}
 
-  const db = await getDb();
-  const coll = db.collection("readings");
-  const insertRes = await coll.insertOne({
-    deviceId: partial.deviceId,
-    temperature: partial.temperature ?? null,
-    humidity: partial.humidity ?? null,
-    pressure: partial.pressure ?? null,
-    rain_mm2: partial.rain_mm2 ?? null,
-    wind_ms: partial.wind_ms ?? null,
-    ts: new Date(partial.ts),
-  });
+// POST /api/readings
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
 
-  return NextResponse.json({ _id: String(insertRes.insertedId) });
+    const payload = (await req.json()) as Partial<{
+      deviceId: string;
+      temperature: number | null;
+      humidity: number | null;
+      pressure: number | null;
+      rain_mm2: number | null;
+      wind_ms: number | null;
+      ts: string;
+    }>;
+
+    const doc: Record<string, unknown> = {
+      deviceId: payload.deviceId ?? "",
+      temperature: payload.temperature ?? null,
+      humidity: payload.humidity ?? null,
+      pressure: payload.pressure ?? null,
+      rain_mm2: payload.rain_mm2 ?? null,
+      wind_ms: payload.wind_ms ?? null,
+      ts: payload.ts ? new Date(payload.ts) : new Date(),
+    };
+
+    const db = await getDb();
+    const coll = db.collection("readings");
+    const res = await coll.insertOne(doc);
+
+    return NextResponse.json(
+      { ok: true, _id: (res.insertedId as ObjectId).toString() },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  } catch {
+    return NextResponse.json(
+      { error: "readings POST failed" },
+      { status: 500 }
+    );
+  }
 }
