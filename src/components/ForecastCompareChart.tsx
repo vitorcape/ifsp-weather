@@ -12,7 +12,7 @@ import {
   Legend,
 } from "recharts";
 
-type Reading = { deviceId: string; temperature: number; ts: string };
+type Reading = { deviceId: string; temperature: number | null; ts: string };
 type Row = { label: string; forecast: number | null; measured: number | null };
 
 const TZ = "America/Sao_Paulo";
@@ -30,7 +30,7 @@ function isTodaySP(ymd: string): boolean {
 function spMidnightISO(ymd: string) {
   const start = new Date(`${ymd}T00:00:00-03:00`);
   const end = new Date(start.getTime() + 24 * 3600 * 1000);
-  return { sinceISO: start.toISOString(), untilISO: end.toISOString() };
+  return { fromISO: start.toISOString(), toISO: end.toISOString() };
 }
 
 export default function ForecastCompareChart({
@@ -51,6 +51,7 @@ export default function ForecastCompareChart({
       setLoading(true);
       setErr(null);
 
+      // 1) Previsão (Open-Meteo) — igual ao seu
       type ForecastJson = { hourly?: { time: string[]; temperature_2m: number[] } };
       const fRes = await fetch(
         `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
@@ -67,28 +68,28 @@ export default function ForecastCompareChart({
         fMap.set(hour, fJson.hourly!.temperature_2m[i]);
       });
 
-      const { sinceISO, untilISO } = spMidnightISO(dateYMD);
+      // 2) Medido — usa from/to (ESSENCIAL) e aceita array ou {items}
+      const { fromISO, toISO } = spMidnightISO(dateYMD);
       const rRes = await fetch(
-        `/api/readings?deviceId=${encodeURIComponent(deviceId!)}` +
-          `&since=${encodeURIComponent(sinceISO)}` +
-          `&until=${encodeURIComponent(untilISO)}` +
-          `&limit=2000`,
+        `/api/readings?deviceId=${encodeURIComponent(deviceId!)}&from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}&limit=2000`,
         { cache: "no-store" }
       );
       if (!rRes.ok) throw new Error(`readings HTTP ${rRes.status}`);
-      const rJson = (await rRes.json()) as Reading[];
+      const rJson = await rRes.json();
+      const readings: Reading[] = Array.isArray(rJson) ? rJson : (rJson?.items ?? []);
 
+      // Média por hora local (ignora temperaturas nulas)
       const buckets: Array<{ sum: number; n: number } | null> = Array(24).fill(null);
-      rJson.forEach(r => {
-        const h = new Date(
-          new Date(r.ts).toLocaleString("en-US", { timeZone: TZ })
-        ).getHours();
+      readings.forEach((r) => {
+        if (r.temperature == null) return;
+        const h = new Date(new Date(r.ts).toLocaleString("en-US", { timeZone: TZ })).getHours();
         if (!buckets[h]) buckets[h] = { sum: 0, n: 0 };
         buckets[h]!.sum += r.temperature;
         buckets[h]!.n += 1;
       });
-      const measuredByHour = buckets.map(b => (b ? b.sum / b.n : null));
+      const measuredByHour = buckets.map((b) => (b ? b.sum / b.n : null));
 
+      // 3) Linhas do gráfico (mantém o visual)
       const newRows: Row[] = Array.from({ length: 24 }, (_, h) => ({
         label: `${String(h).padStart(2, "0")}:00`,
         forecast: fMap.get(h) ?? null,
@@ -106,37 +107,36 @@ export default function ForecastCompareChart({
   useEffect(() => {
     fetchAll();
     const id = isTodaySP(dateYMD) ? setInterval(fetchAll, refreshMs) : undefined;
-    return () => {
-      if (id) clearInterval(id);
-    };
+    return () => { if (id) clearInterval(id); };
   }, [fetchAll, refreshMs, dateYMD]);
 
   const data = useMemo(() => rows, [rows]);
-  const hasAny = data.some(d => d.forecast != null || d.measured != null);
+  const hasAny = data.some((d) => d.forecast != null || d.measured != null);
 
   return (
     <div className="chart-card p-4">
       <div className="d-flex justify-content-between mb-2">
         {err
-          ?<div className="text-warning">Erro: {err}</div>
-          :loading&&!hasAny
-            ?<div className="text-muted">Carregando…</div>
-            :!loading&&!hasAny
-              ?<div className="text-muted">Sem dados</div>
-              :<></>}
+          ? <div className="text-warning">Erro: {err}</div>
+          : loading && !hasAny
+            ? <div className="text-muted">Carregando…</div>
+            : !loading && !hasAny
+              ? <div className="text-muted">Sem dados</div>
+              : <></>}
         <div className="small text-muted">Data: {dateYMD.split("-").reverse().join("/")}</div>
       </div>
-      {hasAny&&(
-        <div style={{height:300}}>
+
+      {hasAny && (
+        <div style={{ height: 300 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{top:10,right:10,left:0,bottom:0}}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
-              <XAxis dataKey="label" tick={{fontSize:12}} interval={1}/>
-              <YAxis unit="°C" tick={{fontSize:12}} width={50} domain={["auto","auto"]}/>
-              <Tooltip formatter={(v,name)=>[typeof v==="number"?v.toFixed(1):v,name]}/>
-              <Legend verticalAlign="top" height={36}/>
-              <Line type="monotone" dataKey="forecast" name="Previsão (°C)" stroke="#0d6efd" dot={{r:2}}/>
-              <Line type="monotone" dataKey="measured" name="Medido (°C)" stroke="#dc3545" dot={{r:3}}/>
+            <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} interval={1} />
+              <YAxis unit="°C" tick={{ fontSize: 12 }} width={50} domain={["auto", "auto"]} />
+              <Tooltip formatter={(v, name) => [typeof v === "number" ? v.toFixed(1) : v, name]} />
+              <Legend verticalAlign="top" height={36} />
+              <Line type="monotone" dataKey="forecast" name="Previsão (°C)" stroke="#0d6efd" dot={{ r: 2 }} />
+              <Line type="monotone" dataKey="measured" name="Medido (°C)" stroke="#dc3545" dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
