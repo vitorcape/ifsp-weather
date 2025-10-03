@@ -8,7 +8,7 @@ import NowBadgeClient from "@/components/NowBadgeClient";
 
 export const metadata: Metadata = {
   title: "IFSP Weather",
-  description: "Projeto IFSP Catanduva",
+  description: "Project IFSP Catanduva",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -27,12 +27,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
             <div className="ms-auto d-flex align-items-center gap-3">
               <Link className="btn btn-sm btn-outline-light rounded-pill px-3" href="/graficos">
-                <i className="fa-solid fa-chart-line me-2"></i>Gráficos
+                <i className="fa-solid fa-chart-line me-2"></i>Graphics
               </Link>
               <Link className="btn btn-sm btn-outline-light rounded-pill px-3" href="/calendario">
-                <i className="fa-solid fa-calendar-days me-2"></i>Calendário
+                <i className="fa-solid fa-calendar-days me-2"></i>Calendar
               </Link><Link className="btn btn-sm btn-outline-light rounded-pill px-3" href="/dados">
-                <i className="fa-solid fa-database me-2"></i>Dados
+                <i className="fa-solid fa-database me-2"></i>Data
               </Link><Link className="btn btn-sm btn-outline-light rounded-pill px-3" href="/log">
                 <i className="fa-solid fa-table me-2"></i>Logs
               </Link>
@@ -48,10 +48,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="container text-center small">
             <div className="mb-1">
               <i className="fa-solid fa-satellite me-2"></i>
-              Estação Meteorológica • IFSP Catanduva
+              Weather Station • IFSP Catanduva
             </div>
             <div className="text-white-50">
-              © {new Date().getFullYear()} IFSP Weather • versão 3.0.6
+              © {new Date().getFullYear()} IFSP Weather • version 3.1.0
             </div>
           </div>
         </footer>

@@ -176,22 +176,22 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
           <div style={{ fontSize: "1.2rem", opacity: 0.9, marginBottom: "0.5rem" }}>
             {last
             ? last.temperature >= 35
-              ? "Muito Quente"
+              ? "Very Hot"
               : last.temperature >= 30
-              ? "Quente"
+              ? "Hot"
               : last.temperature >= 25
-              ? "Agradável"
+              ? "Pleasant"
               : last.temperature >= 20
-              ? "Fresco"
+              ? "Cool"
               : last.temperature >= 15
-              ? "Frio"
-              : "Muito Frio"
+              ? "Cold"
+              : "Very Cold"
             : "--"}
           </div>
           
           <div style={{ fontSize: "1rem", opacity: 0.8, marginBottom: "1rem" }}>
-            Máx: {stats?.tMax != null ? `${stats.tMax.toFixed(1)}°` : "--°"} • 
-            Mín: {stats?.tMin != null ? `${stats.tMin.toFixed(1)}°` : "--°"}
+            Max: {stats?.tMax != null ? `${stats.tMax.toFixed(1)}°` : "--°"} • 
+            Min: {stats?.tMin != null ? `${stats.tMin.toFixed(1)}°` : "--°"}
           </div>
           
           <div style={{ fontSize: "0.9rem", opacity: 0.7 }}>
@@ -199,7 +199,7 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
           </div>
           
           <div style={{ fontSize: "0.8rem", opacity: 0.6 }}>
-            Última atualização: {last ? formatTime(last.ts) : "--:--:-- - --/--/----"}
+            Last update: {last ? formatTime(last.ts) : "--:--:-- - --/--/----"}
           </div>
         </section>
 
@@ -222,13 +222,10 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
             >
               <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
                 <div style={{ fontSize: "1.5rem", marginRight: "10px" }}>💧</div>
-                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>UMIDADE</div>
+                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>HUMIDITY</div>
               </div>
               <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
                 {last ? `${last.humidity.toFixed(0)}%` : "--%"}
-              </div>
-              <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                Ponto de orvalho: {last ? `${Math.round(last.temperature - 5)}°` : "--°"}
               </div>
             </div>
           </div>
@@ -247,13 +244,10 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
             >
               <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
                 <div style={{ fontSize: "1.5rem", marginRight: "10px" }}>🌬️</div>
-                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>VENTO</div>
+                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>WIND</div>
               </div>
               <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
                 {windStats ? `${windStats.avgWind.toFixed(1)} km/h` : "-- km/h"}
-              </div>
-              <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                Nas últimas 24h
               </div>
             </div>
           </div>
@@ -272,13 +266,13 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
             >
               <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
                 <div style={{ fontSize: "1.5rem", marginRight: "10px" }}>📊</div>
-                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>PRESSÃO</div>
+                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>PRESSURE</div>
               </div>
               <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
                 {last ? `${Math.round(last.pressure / 100)} hPa` : "-- hPa"}
               </div>
               <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                {last && last.pressure > 101325 ? "Alta pressão" : "Pressão normal"}
+                {last && last.pressure > 101325 ? "High pressure" : "Normal pressure"}
               </div>
             </div>
           </div>
@@ -297,13 +291,13 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
             >
               <div style={{ display: "flex", alignItems: "center", marginBottom: "12px" }}>
                 <div style={{ fontSize: "1.5rem", marginRight: "10px" }}>🌧️</div>
-                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>CHUVA</div>
+                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>RAIN</div>
               </div>
               <div style={{ fontSize: "2rem", fontWeight: "300", marginBottom: "8px" }}>
                 {data?.rainLast24h != null ? `${data.rainLast24h.toFixed(1)} mm` : "-- mm"}
               </div>
               <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                Nas últimas 24h
+                In the last 24 hours
               </div>
             </div>
           </div>
@@ -324,7 +318,7 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
               <div className="col-6">
                 <div style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
                   <div style={{ fontSize: "1.2rem", marginRight: "8px" }}>🌅</div>
-                  <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>NASCER DO SOL</div>
+                  <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>SUNRISE</div>
                 </div>
                 <div style={{ fontSize: "1.5rem", fontWeight: "300" }}>
                   {formatTime(data?.sunriseLabel)}
@@ -333,7 +327,7 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
               <div className="col-6">
                 <div style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
                   <div style={{ fontSize: "1.2rem", marginRight: "8px" }}>🌅</div>
-                  <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>PÔR DO SOL</div>
+                  <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>SUNSET</div>
                 </div>
                 <div style={{ fontSize: "1.5rem", fontWeight: "300" }}>
                   {formatTime(data?.sunsetLabel)}
@@ -365,7 +359,7 @@ export default function HomeCards({ refreshMs = 15000 }: { refreshMs?: number })
             }}
           >
             <i className="fa-solid fa-circle-info me-2"></i>
-            Saiba mais sobre este projeto
+            Learn more about this project
           </a>
         </div>
       </div>
