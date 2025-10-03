@@ -15,33 +15,24 @@ function isAuthorized(req: NextRequest): boolean {
   return !!serverToken && headerToken === serverToken;
 }
 
-// PATCH /api/readings/[id]
+// PATCH
 export async function PATCH(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }   // 👈 aqui ajustado
 ): Promise<NextResponse> {
   try {
     if (!isAuthorized(req)) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const { id } = context.params;
+    const { id } = await context.params;  // 👈 await no params
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "invalid id" }, { status: 400 });
     }
 
-    const payload = (await req.json()) as Partial<{
-      deviceId: string;
-      temperature: number | null;
-      humidity: number | null;
-      pressure: number | null;
-      rain_mm2: number | null;
-      wind_ms: number | null;
-      ts: string;
-    }>;
-
-    // garantir que só campos válidos são atualizados
+    const payload = await req.json();
     const updateDoc: Record<string, unknown> = {};
+
     if ("deviceId" in payload) updateDoc.deviceId = payload.deviceId ?? "";
     if ("temperature" in payload) updateDoc.temperature = payload.temperature;
     if ("humidity" in payload) updateDoc.humidity = payload.humidity;
@@ -52,39 +43,25 @@ export async function PATCH(
 
     const db = await getDb();
     const coll = db.collection("readings");
-
-    const res = await coll.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: updateDoc }
-    );
-
-    if (res.modifiedCount === 0) {
-      return NextResponse.json(
-        { ok: false, modified: 0 },
-        { status: 404 }
-      );
-    }
+    const res = await coll.updateOne({ _id: new ObjectId(id) }, { $set: updateDoc });
 
     return NextResponse.json({ ok: true, modified: res.modifiedCount });
   } catch (err) {
-    return NextResponse.json(
-      { error: "readings PATCH failed", detail: String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 
-// DELETE /api/readings/[id]
+// DELETE
 export async function DELETE(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }   // 👈 igual no DELETE
 ): Promise<NextResponse> {
   try {
     if (!isAuthorized(req)) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const { id } = context.params;
+    const { id } = await context.params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "invalid id" }, { status: 400 });
     }
@@ -95,9 +72,6 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true, deleted: res.deletedCount });
   } catch (err) {
-    return NextResponse.json(
-      { error: "readings DELETE failed", detail: String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
