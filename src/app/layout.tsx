@@ -7,7 +7,7 @@ import Link from "next/link";
 import NowBadgeClient from "@/components/NowBadgeClient";
 
 export const metadata: Metadata = {
-  title: "Estação Meteorológica",
+  title: "IFSP Weather",
   description: "Projeto IFSP Catanduva",
 };
 
@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="d-flex align-items-center gap-3">
               <Link className="navbar-brand text-white fw-semibold d-flex align-items-center gap-2 m-0" href="/">
                 <i className="fa-solid fa-satellite"></i>
-                <span>Estação Metereológica</span>
+                <span>IFSP Weather</span>
               </Link>
               <NowBadgeClient refreshMs={30000} />
             </div>
@@ -48,11 +48,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="container text-center small">
             <div className="mb-1">
               <i className="fa-solid fa-satellite me-2"></i>
-              Projeto IoT com ESP32 • Dados em tempo real
+              Estação Meteorológica • IFSP Catanduva
             </div>
             <div className="text-white-50">
-              © {new Date().getFullYear()} Estação Metereológica • Desenvolvido com{" "}
-              <i className="fa-solid fa-heart text-danger"></i>
+              © {new Date().getFullYear()} Desenvolvida por brasileiros
             </div>
           </div>
         </footer>

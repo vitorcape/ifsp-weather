@@ -1,26 +1,10 @@
+// src/app/api/readings/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type RouteContext =
-  | { params: { id: string } }
-  | { params: Promise<{ id: string }> };
-
-function isPromise<T>(x: unknown): x is Promise<T> {
-  return typeof x === "object" && x !== null && "then" in (x as object);
-}
-
-async function getIdFromContext(ctx: RouteContext): Promise<string> {
-  const raw = (ctx as RouteContext).params as unknown;
-  if (isPromise<{ id: string }>(raw)) {
-    const p = await raw;
-    return p.id;
-  }
-  return (raw as { id: string }).id;
-}
 
 function isAuthorized(req: NextRequest): boolean {
   const headerToken = req.headers.get("x-admin-token") ?? "";
@@ -31,69 +15,60 @@ function isAuthorized(req: NextRequest): boolean {
   return !!serverToken && headerToken === serverToken;
 }
 
-// GET /api/readings/[id]
-export async function GET(
-  _req: NextRequest,
-  ctx: RouteContext
-): Promise<NextResponse> {
-  try {
-    const id = await getIdFromContext(ctx);
-    const db = await getDb();
-    const coll = db.collection("readings");
-    const doc = await coll.findOne({ _id: new ObjectId(id) });
-    if (!doc) {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
-    }
-    return NextResponse.json(doc, { headers: { "Cache-Control": "no-store" } });
-  } catch (e) {
-    return NextResponse.json(
-      { error: "readings/[id] GET failed" },
-      { status: 500 }
-    );
-  }
-}
-
 // PATCH /api/readings/[id]
 export async function PATCH(
   req: NextRequest,
-  ctx: RouteContext
+  context: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
     if (!isAuthorized(req)) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const id = await getIdFromContext(ctx);
-    const body = (await req.json()) as Partial<{
-      deviceId: string | null;
+    const { id } = context.params;
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "invalid id" }, { status: 400 });
+    }
+
+    const payload = (await req.json()) as Partial<{
+      deviceId: string;
       temperature: number | null;
       humidity: number | null;
       pressure: number | null;
       rain_mm2: number | null;
       wind_ms: number | null;
-      ts: string | null;
+      ts: string;
     }>;
 
-    const update: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      update[k] = v;
-    }
+    // garantir que só campos válidos são atualizados
+    const updateDoc: Record<string, unknown> = {};
+    if ("deviceId" in payload) updateDoc.deviceId = payload.deviceId ?? "";
+    if ("temperature" in payload) updateDoc.temperature = payload.temperature;
+    if ("humidity" in payload) updateDoc.humidity = payload.humidity;
+    if ("pressure" in payload) updateDoc.pressure = payload.pressure;
+    if ("rain_mm2" in payload) updateDoc.rain_mm2 = payload.rain_mm2;
+    if ("wind_ms" in payload) updateDoc.wind_ms = payload.wind_ms;
+    if ("ts" in payload) updateDoc.ts = payload.ts ? new Date(payload.ts) : new Date();
 
     const db = await getDb();
     const coll = db.collection("readings");
+
     const res = await coll.updateOne(
       { _id: new ObjectId(id) },
-      { $set: update }
+      { $set: updateDoc }
     );
 
+    if (res.modifiedCount === 0) {
+      return NextResponse.json(
+        { ok: false, modified: 0 },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ ok: true, modified: res.modifiedCount });
+  } catch (err) {
     return NextResponse.json(
-      { ok: true, modified: res.modifiedCount },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (e) {
-    return NextResponse.json(
-      { error: "readings/[id] PATCH failed" },
+      { error: "readings PATCH failed", detail: String(err) },
       { status: 500 }
     );
   }
@@ -102,25 +77,26 @@ export async function PATCH(
 // DELETE /api/readings/[id]
 export async function DELETE(
   req: NextRequest,
-  ctx: RouteContext
+  context: { params: { id: string } }
 ): Promise<NextResponse> {
   try {
     if (!isAuthorized(req)) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const id = await getIdFromContext(ctx);
+    const { id } = context.params;
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "invalid id" }, { status: 400 });
+    }
+
     const db = await getDb();
     const coll = db.collection("readings");
     const res = await coll.deleteOne({ _id: new ObjectId(id) });
 
+    return NextResponse.json({ ok: true, deleted: res.deletedCount });
+  } catch (err) {
     return NextResponse.json(
-      { ok: true, deleted: res.deletedCount },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (e) {
-    return NextResponse.json(
-      { error: "readings/[id] DELETE failed" },
+      { error: "readings DELETE failed", detail: String(err) },
       { status: 500 }
     );
   }
