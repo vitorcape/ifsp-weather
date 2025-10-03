@@ -1,7 +1,7 @@
 // src/app/log/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { ptBR } from "date-fns/locale";
 
@@ -15,6 +15,8 @@ type Reading = {
   wind_ms: number | null;
   ts: string; // ISO string
 };
+
+type ApiListResponse = Reading[] | { items: Reading[] };
 
 const TZ = "America/Sao_Paulo";
 
@@ -35,12 +37,15 @@ function fmtLocal(dtISO: string) {
   const d = new Date(dtISO);
   return d.toLocaleString("pt-BR", { timeZone: TZ });
 }
+function ensureArray(resp: ApiListResponse): Reading[] {
+  return Array.isArray(resp) ? resp : resp.items;
+}
 
 const ALL_COLUMNS = [
   { key: "deviceId", label: "Device" },
-  { key: "temperature", label: "Temp (oC)" },
+  { key: "temperature", label: "Temp (°C)" },
   { key: "humidity", label: "Umidade (%)" },
-  { key: "pressure", label: "Pressao (Pa)" },
+  { key: "pressure", label: "Pressão (Pa)" },
   { key: "rain_mm2", label: "Chuva (mm)" },
   { key: "wind_ms", label: "Vento (km/h)" },
   { key: "ts", label: "Timestamp" },
@@ -57,9 +62,15 @@ export default function LogPage() {
   const [limit, setLimit] = useState<number>(500);
 
   // Colunas escolhidas
-  const [visibleCols, setVisibleCols] = useState<ColKey[]>(
-    ["deviceId", "temperature", "humidity", "pressure", "rain_mm2", "wind_ms", "ts"]
-  );
+  const [visibleCols, setVisibleCols] = useState<ColKey[]>([
+    "deviceId",
+    "temperature",
+    "humidity",
+    "pressure",
+    "rain_mm2",
+    "wind_ms",
+    "ts",
+  ]);
 
   // Dados
   const [rows, setRows] = useState<Reading[]>([]);
@@ -76,40 +87,50 @@ export default function LogPage() {
     return qs.toString();
   }, [range?.from, range?.to, deviceId, limit]);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!params) return;
     setLoading(true);
     setErr(null);
     try {
       const res = await fetch(`/api/readings?${params}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const arr = Array.isArray(json) ? json : json?.items;
-      const safe: Reading[] = (arr ?? []) as Reading[];
+      const json: unknown = await res.json();
+      const arr = ensureArray(json as ApiListResponse);
+      const safe: Reading[] = arr ?? [];
       // garantir ordenação decrescente por ts
-      safe.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+      safe.sort(
+        (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
+      );
       setRows(safe);
-    } catch (e: any) {
-      setErr(String(e?.message ?? e));
+    } catch (e) {
+      setErr(String(e));
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, [params]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [params]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   // UI helpers de coluna
   function toggleCol(k: ColKey) {
-    setVisibleCols(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k]);
+    setVisibleCols((prev) =>
+      prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]
+    );
   }
   const allOn = visibleCols.length === ALL_COLUMNS.length;
   function toggleAllCols() {
-    setVisibleCols(allOn ? [] : ALL_COLUMNS.map(c => c.key));
+    setVisibleCols(allOn ? [] : ALL_COLUMNS.map((c) => c.key));
   }
 
   // Exportações
-  function downloadFile(filename: string, content: string, mime = "text/plain;charset=utf-8") {
+  function downloadFile(
+    filename: string,
+    content: string,
+    mime = "text/plain;charset=utf-8"
+  ) {
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -121,29 +142,51 @@ export default function LogPage() {
 
   function exportJSON() {
     const payload = JSON.stringify(rows, null, 2);
-    downloadFile(`leituras_${Date.now()}.json`, payload, "application/json;charset=utf-8");
+    downloadFile(
+      `leituras_${Date.now()}.json`,
+      payload,
+      "application/json;charset=utf-8"
+    );
   }
 
-  function csvEscape(val: any) {
+  function csvEscape(val: unknown) {
     if (val === null || val === undefined) return "";
     const s = String(val);
     if (/[",\n;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   }
 
+  function valueForKey(r: Reading, k: ColKey): string | number | null {
+    switch (k) {
+      case "deviceId":
+        return r.deviceId;
+      case "temperature":
+        return r.temperature;
+      case "humidity":
+        return r.humidity;
+      case "pressure":
+        return r.pressure;
+      case "rain_mm2":
+        return r.rain_mm2;
+      case "wind_ms":
+        return r.wind_ms;
+      case "ts":
+        // exporta legível
+        return fmtLocal(r.ts);
+      default:
+        return "";
+    }
+  }
+
   function exportCSV() {
     // só exportar as colunas visíveis, na ordem atual
-    const headers = visibleCols.map(k => {
-      const meta = ALL_COLUMNS.find(c => c.key === k)!;
+    const headers = visibleCols.map((k) => {
+      const meta = ALL_COLUMNS.find((c) => c.key === k)!;
       return meta.label;
     });
 
-    const lines = rows.map(r =>
-      visibleCols.map(k => {
-        let v: any = (r as any)[k];
-        if (k === "ts") v = fmtLocal(r.ts); // exportar já legível
-        return csvEscape(v);
-      }).join(";")
+    const lines = rows.map((r) =>
+      visibleCols.map((k) => csvEscape(valueForKey(r, k))).join(";")
     );
 
     const csv = [headers.join(";"), ...lines].join("\n");
@@ -157,7 +200,14 @@ export default function LogPage() {
   return (
     <div className="container py-4">
       {/* Cabeçalho */}
-      <section className="chart-card mb-3 p-3" style={{ background: cardBg, border: `1px solid ${cardBor}`, borderRadius: 16 }}>
+      <section
+        className="chart-card mb-3 p-3"
+        style={{
+          background: cardBg,
+          border: `1px solid ${cardBor}`,
+          borderRadius: 16,
+        }}
+      >
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
           <h2 className="m-0 text-white">
             <i className="fa-solid fa-list me-2"></i>
@@ -179,10 +229,24 @@ export default function LogPage() {
       </section>
 
       {/* Filtros */}
-      <section className="chart-card mb-3 p-3" style={{ background: cardBg, border: `1px solid ${cardBor}`, borderRadius: 16 }}>
+      <section
+        className="chart-card mb-3 p-3"
+        style={{
+          background: cardBg,
+          border: `1px solid ${cardBor}`,
+          borderRadius: 16,
+        }}
+      >
         <div className="row g-3">
           <div className="col-12 col-lg-4">
-            <div className="p-2" style={{ background: cardBg, border: `1px solid ${cardBor}`, borderRadius: 12 }}>
+            <div
+              className="p-2"
+              style={{
+                background: cardBg,
+                border: `1px solid ${cardBor}`,
+                borderRadius: 12,
+              }}
+            >
               <div className="fw-semibold mb-2">
                 <i className="fa-regular fa-calendar-range me-2"></i>Período
               </div>
@@ -201,7 +265,14 @@ export default function LogPage() {
           </div>
 
           <div className="col-12 col-lg-8">
-            <div className="p-2" style={{ background: cardBg, border: `1px solid ${cardBor}`, borderRadius: 12 }}>
+            <div
+              className="p-2"
+              style={{
+                background: cardBg,
+                border: `1px solid ${cardBor}`,
+                borderRadius: 12,
+              }}
+            >
               <div className="row g-3">
                 <div className="col-12 col-md-6 col-xl-4">
                   <label className="form-label mb-1">Device ID</label>
@@ -220,12 +291,17 @@ export default function LogPage() {
                     value={limit}
                     min={1}
                     max={5000}
-                    onChange={(e) => setLimit(Math.max(1, Math.min(5000, Number(e.target.value || 1))))}
+                    onChange={(e) =>
+                      setLimit(
+                        Math.max(1, Math.min(5000, Number(e.target.value || 1)))
+                      )
+                    }
                   />
                 </div>
                 <div className="col-12 d-flex align-items-end">
                   <button className="btn btn-primary ms-auto" onClick={load}>
-                    <i className="fa-solid fa-magnifying-glass me-2"></i> Buscar
+                    <i className="fa-solid fa-magnifying-glass me-2"></i>{" "}
+                    Buscar
                   </button>
                 </div>
               </div>
@@ -236,13 +312,18 @@ export default function LogPage() {
                 <div className="d-flex flex-wrap align-items-center gap-2">
                   <span className="fw-semibold">Colunas:</span>
                   <button
-                    className={`btn btn-sm ${allOn ? "btn-success" : "btn-outline-light"}`}
+                    className={`btn btn-sm ${
+                      allOn ? "btn-success" : "btn-outline-light"
+                    }`}
                     onClick={toggleAllCols}
                   >
                     {allOn ? "Todas ativas" : "Ativar todas"}
                   </button>
-                  {ALL_COLUMNS.map(c => (
-                    <label key={c.key} className="btn btn-sm btn-outline-light m-0">
+                  {ALL_COLUMNS.map((c) => (
+                    <label
+                      key={c.key}
+                      className="btn btn-sm btn-outline-light m-0"
+                    >
                       <input
                         type="checkbox"
                         className="form-check-input me-2"
@@ -260,21 +341,39 @@ export default function LogPage() {
       </section>
 
       {/* Tabela */}
-      <section className="chart-card p-3" style={{ background: cardBg, border: `1px solid ${cardBor}`, borderRadius: 16 }}>
+      <section
+        className="chart-card p-3"
+        style={{
+          background: cardBg,
+          border: `1px solid ${cardBor}`,
+          borderRadius: 16,
+        }}
+      >
         <div className="d-flex justify-content-between align-items-center mb-2">
           <div className="small">
             {range?.from && range?.to ? (
               <>
                 <strong>Período:</strong>{" "}
-                {startOfDaySP(range.from).toLocaleDateString("pt-BR", { timeZone: TZ })} —{" "}
-                {endOfDaySP(range.to).toLocaleDateString("pt-BR", { timeZone: TZ })}
+                {startOfDaySP(range.from).toLocaleDateString("pt-BR", {
+                  timeZone: TZ,
+                })}{" "}
+                —{" "}
+                {endOfDaySP(range.to).toLocaleDateString("pt-BR", {
+                  timeZone: TZ,
+                })}
               </>
             ) : (
               <span className="text-muted">Selecione um período</span>
             )}
           </div>
           <div className="small">
-            {rows.length > 0 ? <span><strong>{rows.length}</strong> registros</span> : <span className="text-muted">Sem dados</span>}
+            {rows.length > 0 ? (
+              <span>
+                <strong>{rows.length}</strong> registros
+              </span>
+            ) : (
+              <span className="text-muted">Sem dados</span>
+            )}
           </div>
         </div>
 
@@ -286,16 +385,20 @@ export default function LogPage() {
             <table className="table table-sm align-middle">
               <thead className="table-light" style={{ position: "sticky", top: 0 }}>
                 <tr>
-                  {ALL_COLUMNS.filter(c => visibleCols.includes(c.key)).map(c => (
+                  {ALL_COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => (
                     <th key={c.key}>{c.label}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {(rows ?? []).length === 0 && (
-                  <tr><td colSpan={visibleCols.length} className="text-center text-muted py-4">Sem registros no período.</td></tr>
+                  <tr>
+                    <td colSpan={visibleCols.length} className="text-center text-muted py-4">
+                      Sem registros no período.
+                    </td>
+                  </tr>
                 )}
-                {(rows ?? []).map(r => (
+                {(rows ?? []).map((r) => (
                   <tr key={r._id}>
                     {visibleCols.includes("deviceId") && <td>{r.deviceId}</td>}
                     {visibleCols.includes("temperature") && <td>{r.temperature ?? "—"}</td>}
@@ -303,10 +406,12 @@ export default function LogPage() {
                     {visibleCols.includes("pressure") && <td>{r.pressure ?? "—"}</td>}
                     {visibleCols.includes("rain_mm2") && <td>{r.rain_mm2 ?? "—"}</td>}
                     {visibleCols.includes("wind_ms") && <td>{r.wind_ms ?? "—"}</td>}
-                    {visibleCols.includes("ts") && <td>
-                      <div className="fw-semibold">{fmtLocal(r.ts)}</div>
-                      <div className="small text-muted">{r.ts}</div>
-                    </td>}
+                    {visibleCols.includes("ts") && (
+                      <td>
+                        <div className="fw-semibold">{fmtLocal(r.ts)}</div>
+                        <div className="small text-muted">{r.ts}</div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

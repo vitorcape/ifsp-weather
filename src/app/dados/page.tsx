@@ -1,7 +1,7 @@
 // src/app/dados/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback, FormEvent } from "react";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { ptBR } from "date-fns/locale";
 import Swal from "sweetalert2";
@@ -16,6 +16,8 @@ type Reading = {
   wind_ms: number | null;
   ts: string; // ISO
 };
+
+type ApiListResponse = Reading[] | { items: Reading[] };
 
 const TZ = "America/Sao_Paulo";
 
@@ -37,10 +39,13 @@ function fmtLocal(dtISO: string) {
   const d = new Date(dtISO);
   return d.toLocaleString("pt-BR", { timeZone: TZ });
 }
+function ensureArray(resp: ApiListResponse): Reading[] {
+  return Array.isArray(resp) ? resp : resp.items;
+}
 
 // ======= Sessão (token) =======
-const AUTH_LS_KEY = "dadosAuth";           // onde guardo a sessão
-const SESSION_MINUTES = 120;               // validade da sessão (ex.: 120min)
+const AUTH_LS_KEY = "dadosAuth"; // onde guardo a sessão
+const SESSION_MINUTES = 120;     // validade da sessão (ex.: 120min)
 
 type AuthSession = {
   token: string;
@@ -68,6 +73,32 @@ function clearSession() {
   localStorage.removeItem(AUTH_LS_KEY);
 }
 
+// ======= Criar leitura (sem any) =======
+type Creating = Partial<
+  Pick<
+    Reading,
+    | "deviceId"
+    | "temperature"
+    | "humidity"
+    | "pressure"
+    | "rain_mm2"
+    | "wind_ms"
+    | "ts"
+  >
+>;
+
+const fields = [
+  ["deviceId", "Device ID", "text"] as const,
+  ["temperature", "Temp (°C)", "number"] as const,
+  ["humidity", "Umid (%)", "number"] as const,
+  ["pressure", "Press (Pa)", "number"] as const,
+  ["rain_mm2", "Chuva (mm)", "number"] as const,
+  ["wind_ms", "Vento (km/h)", "number"] as const,
+  ["ts", "Timestamp ISO", "text"] as const,
+];
+type FieldKey = typeof fields[number][0];
+type FieldType = typeof fields[number][2];
+
 // =====================================================
 
 export default function DadosPage() {
@@ -89,7 +120,7 @@ export default function DadosPage() {
 
   // Seleção e criação
   const [selection, setSelection] = useState<Record<string, boolean>>({});
-  const [creating, setCreating] = useState<Partial<Reading>>({
+  const [creating, setCreating] = useState<Creating>({
     deviceId: "",
     temperature: null,
     humidity: null,
@@ -115,32 +146,27 @@ export default function DadosPage() {
     return qs.toString();
   }, [range?.from, range?.to, deviceId]);
 
-  async function load() {
+  const load = useCallback(async () => {
+    if (!authed) return;
     setLoading(true);
     setErr(null);
     try {
       const res = await fetch(`/api/readings?${params}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const arr: unknown =
-        Array.isArray(json) ? json :
-        (json && Array.isArray((json as any).items) ? (json as any).items : []);
-      setRows((arr ?? []) as Reading[]);
-    } catch (e: any) {
-      setErr(String(e?.message ?? e));
+      const json: unknown = await res.json();
+      const arr = ensureArray(json as ApiListResponse);
+      setRows(arr ?? []);
+    } catch (e) {
+      setErr(String(e));
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, [params, authed]);
 
   useEffect(() => {
-    if (authed) {
-      // só carrega se autenticado
-      load();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params, authed]);
+    void load();
+  }, [load]);
 
   function requireValidSession(): string | null {
     const sess = getSession();
@@ -157,8 +183,20 @@ export default function DadosPage() {
   }
 
   function updateCell(id: string, key: keyof Reading, value: string) {
-    setRows(prev =>
-      prev.map(r => (r._id === id ? { ...r, [key]: key === "ts" ? value : value === "" ? null : Number(value) } : r))
+    setRows((prev) =>
+      prev.map((r) =>
+        r._id === id
+          ? {
+              ...r,
+              [key]:
+                key === "ts"
+                  ? value
+                  : value === ""
+                  ? null
+                  : Number(value),
+            }
+          : r
+      )
     );
   }
 
@@ -170,7 +208,7 @@ export default function DadosPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-token": token, // usa token da sessão
+          "x-admin-token": token,
         },
         body: JSON.stringify({
           deviceId: r.deviceId ?? null,
@@ -185,7 +223,12 @@ export default function DadosPage() {
 
       if (!res.ok) throw new Error(`Falha ao salvar (HTTP ${res.status})`);
 
-      Swal.fire({ icon: "success", title: "Alteração salva!", timer: 1500, showConfirmButton: false });
+      Swal.fire({
+        icon: "success",
+        title: "Alteração salva!",
+        timer: 1500,
+        showConfirmButton: false,
+      });
     } catch (err) {
       Swal.fire({ icon: "error", title: "Erro ao salvar", text: String(err) });
     }
@@ -195,7 +238,7 @@ export default function DadosPage() {
     const token = requireValidSession();
     if (!token) return;
 
-    const ids = Object.keys(selection).filter(id => selection[id]);
+    const ids = Object.keys(selection).filter((id) => selection[id]);
     if (!ids.length) return;
 
     const confirm = await Swal.fire({
@@ -221,7 +264,12 @@ export default function DadosPage() {
       setSelection({});
       await load();
 
-      Swal.fire({ icon: "success", title: "Registros excluídos!", timer: 1500, showConfirmButton: false });
+      Swal.fire({
+        icon: "success",
+        title: "Registros excluídos!",
+        timer: 1500,
+        showConfirmButton: false,
+      });
     } catch (err) {
       Swal.fire({ icon: "error", title: "Erro ao excluir", text: String(err) });
     }
@@ -253,23 +301,33 @@ export default function DadosPage() {
       });
       await load();
 
-      Swal.fire({ icon: "success", title: "Registro criado!", timer: 1500, showConfirmButton: false });
+      Swal.fire({
+        icon: "success",
+        title: "Registro criado!",
+        timer: 1500,
+        showConfirmButton: false,
+      });
     } catch (err) {
       Swal.fire({ icon: "error", title: "Erro ao criar", text: String(err) });
     }
   }
 
-  function doLogin(e: React.FormEvent) {
+  function doLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const tok = tokenInput.trim();
     if (!tok) {
       Swal.fire({ icon: "warning", title: "Informe o token" });
       return;
     }
-    setSession(tok);        // salva no localStorage com expiração
+    setSession(tok); // salva no localStorage com expiração
     setAuthed(true);
     setTokenInput("");
-    Swal.fire({ icon: "success", title: "Acesso liberado!", timer: 1200, showConfirmButton: false });
+    Swal.fire({
+      icon: "success",
+      title: "Acesso liberado!",
+      timer: 1200,
+      showConfirmButton: false,
+    });
   }
 
   function doLogout() {
@@ -279,6 +337,18 @@ export default function DadosPage() {
     setSelection({});
   }
 
+  function getCreatingValue(k: FieldKey) {
+    const v = creating[k];
+    return typeof v === "number" || typeof v === "string" ? v : v ?? "";
+  }
+
+  function setCreatingValue(k: FieldKey, val: string, type: FieldType) {
+    setCreating((prev) => ({
+      ...prev,
+      [k]: type === "number" ? (val === "" ? null : Number(val)) : val,
+    }));
+  }
+
   const isDay = true;
   const cardBg = isDay ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)";
   const cardBor = isDay ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)";
@@ -286,12 +356,27 @@ export default function DadosPage() {
   // ========= Tela de Login =========
   if (!authed) {
     return (
-      <div className="container py-5 d-flex align-items-center justify-content-center" style={{ minHeight: "70vh" }}>
-        <div className="chart-card p-4" style={{ maxWidth: 440, width: "100%", background: cardBg, border: `1px solid ${cardBor}`, borderRadius: 16 }}>
+      <div
+        className="container py-5 d-flex align-items-center justify-content-center"
+        style={{ minHeight: "70vh" }}
+      >
+        <div
+          className="chart-card p-4"
+          style={{
+            maxWidth: 440,
+            width: "100%",
+            background: cardBg,
+            border: `1px solid ${cardBor}`,
+            borderRadius: 16,
+          }}
+        >
           <h2 className="h4 text-white mb-3">
             <i className="fa-solid fa-lock me-2"></i> Acesso restrito
           </h2>
-          <p className="text-white-50 mb-3">Informe o token para gerenciar os dados. A sessão expira em {SESSION_MINUTES} min.</p>
+          <p className="text-white-50 mb-3">
+            Informe o token para gerenciar os dados. A sessão expira em{" "}
+            {SESSION_MINUTES} min.
+          </p>
           <form onSubmit={doLogin}>
             <label className="form-label text-white-50">Token</label>
             <input
@@ -314,9 +399,18 @@ export default function DadosPage() {
   // ========= Página principal =========
   return (
     <div className="container py-4">
-      <section className="chart-card mb-3 p-3" style={{ background: cardBg, border: `1px solid ${cardBor}`, borderRadius: 16 }}>
+      <section
+        className="chart-card mb-3 p-3"
+        style={{
+          background: cardBg,
+          border: `1px solid ${cardBor}`,
+          borderRadius: 16,
+        }}
+      >
         <div className="d-flex align-items-center justify-content-between gap-2">
-          <h2 className="m-0 text-white"><i className="fa-solid fa-database me-2"></i> Gestão de Dados</h2>
+          <h2 className="m-0 text-white">
+            <i className="fa-solid fa-database me-2"></i> Gestão de Dados
+          </h2>
           <button className="btn btn-outline-light btn-sm" onClick={doLogout}>
             <i className="fa-solid fa-right-from-bracket me-2"></i> Sair
           </button>
@@ -324,8 +418,17 @@ export default function DadosPage() {
 
         <div className="row mt-3 g-3">
           <div className="col-12 col-lg-4">
-            <div className="p-2" style={{ background: cardBg, border: `1px solid ${cardBor}`, borderRadius: 12 }}>
-              <div className="fw-semibold mb-2"><i className="fa-regular fa-calendar-range me-2"></i>Período</div>
+            <div
+              className="p-2"
+              style={{
+                background: cardBg,
+                border: `1px solid ${cardBor}`,
+                borderRadius: 12,
+              }}
+            >
+              <div className="fw-semibold mb-2">
+                <i className="fa-regular fa-calendar-range me-2"></i>Período
+              </div>
               <DayPicker
                 mode="range"
                 selected={range}
@@ -340,26 +443,47 @@ export default function DadosPage() {
             </div>
           </div>
           <div className="col-12 col-lg-8">
-            <div className="p-2" style={{ background: cardBg, border: `1px solid ${cardBor}`, borderRadius: 12 }}>
+            <div
+              className="p-2"
+              style={{
+                background: cardBg,
+                border: `1px solid ${cardBor}`,
+                borderRadius: 12,
+              }}
+            >
               <div className="d-flex flex-wrap gap-2 align-items-end">
                 <div>
                   <label className="form-label mb-1">Device ID</label>
-                  <input className="form-control" value={deviceId} onChange={(e) => setDeviceId(e.target.value)} placeholder="Opcional" />
+                  <input
+                    className="form-control"
+                    value={deviceId}
+                    onChange={(e) => setDeviceId(e.target.value)}
+                    placeholder="Opcional"
+                  />
                 </div>
                 <button className="btn btn-primary ms-auto" onClick={load}>
                   <i className="fa-solid fa-magnifying-glass me-2"></i> Buscar
                 </button>
-                <button className="btn btn-outline-danger" onClick={deleteSelected}>
+                <button
+                  className="btn btn-outline-danger"
+                  onClick={deleteSelected}
+                >
                   <i className="fa-solid fa-trash me-2"></i> Excluir selecionados
                 </button>
               </div>
 
-              <div className="mt-3 table-responsive" style={{ maxHeight: 520, overflow: "auto" }}>
+              <div
+                className="mt-3 table-responsive"
+                style={{ maxHeight: 520, overflow: "auto" }}
+              >
                 {loading && <div className="text-muted">Carregando…</div>}
                 {err && <div className="text-warning">Erro: {err}</div>}
                 {!loading && !err && (
                   <table className="table table-sm align-middle">
-                    <thead className="table-light" style={{ position: "sticky", top: 0 }}>
+                    <thead
+                      className="table-light"
+                      style={{ position: "sticky", top: 0 }}
+                    >
                       <tr>
                         <th style={{ width: 36 }}></th>
                         <th>Device</th>
@@ -379,48 +503,100 @@ export default function DadosPage() {
                             <input
                               type="checkbox"
                               checked={!!selection[r._id]}
-                              onChange={(e) => setSelection(s => ({ ...s, [r._id]: e.target.checked }))}
+                              onChange={(e) =>
+                                setSelection((s) => ({
+                                  ...s,
+                                  [r._id]: e.target.checked,
+                                }))
+                              }
                             />
                           </td>
                           <td>
-                            <input className="form-control form-control-sm"
-                                   value={r.deviceId}
-                                   onChange={(e) => updateCell(r._id, "deviceId", e.target.value)} />
+                            <input
+                              className="form-control form-control-sm"
+                              value={r.deviceId}
+                              onChange={(e) =>
+                                updateCell(r._id, "deviceId", e.target.value)
+                              }
+                            />
                           </td>
                           <td>
-                            <input type="number" step="0.1" className="form-control form-control-sm"
-                                   value={r.temperature ?? ""}
-                                   onChange={(e) => updateCell(r._id, "temperature", e.target.value)} />
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="form-control form-control-sm"
+                              value={r.temperature ?? ""}
+                              onChange={(e) =>
+                                updateCell(
+                                  r._id,
+                                  "temperature",
+                                  e.target.value
+                                )
+                              }
+                            />
                           </td>
                           <td>
-                            <input type="number" step="1" className="form-control form-control-sm"
-                                   value={r.humidity ?? ""}
-                                   onChange={(e) => updateCell(r._id, "humidity", e.target.value)} />
+                            <input
+                              type="number"
+                              step="1"
+                              className="form-control form-control-sm"
+                              value={r.humidity ?? ""}
+                              onChange={(e) =>
+                                updateCell(r._id, "humidity", e.target.value)
+                              }
+                            />
                           </td>
                           <td>
-                            <input type="number" step="1" className="form-control form-control-sm"
-                                   value={r.pressure ?? ""}
-                                   onChange={(e) => updateCell(r._id, "pressure", e.target.value)} />
+                            <input
+                              type="number"
+                              step="1"
+                              className="form-control form-control-sm"
+                              value={r.pressure ?? ""}
+                              onChange={(e) =>
+                                updateCell(r._id, "pressure", e.target.value)
+                              }
+                            />
                           </td>
                           <td>
-                            <input type="number" step="0.1" className="form-control form-control-sm"
-                                   value={r.rain_mm2 ?? ""}
-                                   onChange={(e) => updateCell(r._id, "rain_mm2", e.target.value)} />
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="form-control form-control-sm"
+                              value={r.rain_mm2 ?? ""}
+                              onChange={(e) =>
+                                updateCell(r._id, "rain_mm2", e.target.value)
+                              }
+                            />
                           </td>
                           <td>
-                            <input type="number" step="0.1" className="form-control form-control-sm"
-                                   value={r.wind_ms ?? ""}
-                                   onChange={(e) => updateCell(r._id, "wind_ms", e.target.value)} />
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="form-control form-control-sm"
+                              value={r.wind_ms ?? ""}
+                              onChange={(e) =>
+                                updateCell(r._id, "wind_ms", e.target.value)
+                              }
+                            />
                           </td>
                           <td>
-                            <input className="form-control form-control-sm"
-                                   value={r.ts}
-                                   onChange={(e) => updateCell(r._id, "ts", e.target.value)} />
-                            <div className="small text-muted">{fmtLocal(r.ts)}</div>
+                            <input
+                              className="form-control form-control-sm"
+                              value={r.ts}
+                              onChange={(e) =>
+                                updateCell(r._id, "ts", e.target.value)
+                              }
+                            />
+                            <div className="small text-muted">
+                              {fmtLocal(r.ts)}
+                            </div>
                           </td>
                           <td>
                             <div className="d-flex gap-1">
-                              <button className="btn btn-sm btn-success" onClick={() => saveRow(r)}>
+                              <button
+                                className="btn btn-sm btn-success"
+                                onClick={() => saveRow(r)}
+                              >
                                 <i className="fa-solid fa-save"></i>
                               </button>
                               <button
@@ -463,30 +639,19 @@ export default function DadosPage() {
 
               {/* criar novo */}
               <div className="mt-3 p-2 border rounded">
-                <div className="fw-semibold mb-2"><i className="fa-solid fa-plus me-2"></i> Inserir leitura</div>
+                <div className="fw-semibold mb-2">
+                  <i className="fa-solid fa-plus me-2"></i> Inserir leitura
+                </div>
                 <div className="row g-2">
-                  {([
-                    ["deviceId", "Device ID", "text"],
-                    ["temperature", "Temp (°C)", "number"],
-                    ["humidity", "Umid (%)", "number"],
-                    ["pressure", "Press (Pa)", "number"],
-                    ["rain_mm2", "Chuva (mm)", "number"],
-                    ["wind_ms", "Vento (km/h)", "number"],
-                    ["ts", "Timestamp ISO", "text"],
-                  ] as const).map(([key, label, type]) => (
+                  {fields.map(([key, label, type]) => (
                     <div key={key} className="col-12 col-md-6 col-xl-3">
                       <label className="form-label mb-1">{label}</label>
                       <input
                         type={type}
                         className="form-control form-control-sm"
-                        value={String((creating as any)[key] ?? "")}
+                        value={getCreatingValue(key)}
                         onChange={(e) =>
-                          setCreating(c => ({
-                            ...c,
-                            [key]: type === "number"
-                              ? (e.target.value === "" ? null : Number(e.target.value))
-                              : e.target.value
-                          }))
+                          setCreatingValue(key, e.target.value, type)
                         }
                       />
                     </div>
@@ -498,7 +663,7 @@ export default function DadosPage() {
                   </button>
                 </div>
               </div>
-
+              {/* fim criar novo */}
             </div>
           </div>
         </div>
